@@ -1,5 +1,9 @@
 # CHANGE_LOG
 
+## 2026-02-14T21:23:36+09:00
+- Windows 실행 시 `libgcc_s_seh-1.dll` 누락 오류를 해결하기 위해 `CMakeLists.txt`에 MinGW 전용 정적 링크 옵션(`-static`, `-static-libgcc`, `-static-libstdc++`)을 추가했다.
+- 재빌드 후 실행 파일의 DLL 의존성을 재검증해 MinGW 런타임 DLL(`libgcc_s_seh-1.dll`, `libstdc++-6.dll`) 의존이 제거되도록 조정했다.
+
 ## 2026-02-14T21:22:01+09:00
 - WSL에서 `cmake -S . -B build-mingw -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++` 빌드를 시도하던 중 MinGW 링크 단계에서 `WinMain` 엔트리포인트 누락 오류를 확인했다.
 - `src/Main.cpp`에 `WinMain` 래퍼를 추가해 기존 `wWinMain` 흐름을 재사용하도록 조정하고 MinGW 교차 컴파일 호환성을 보완했다.

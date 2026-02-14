@@ -15,3 +15,11 @@ target_link_libraries(OverlayBreathingPreview PRIVATE
     d2d1
     windowscodecs
 )
+
+if(MINGW)
+    target_link_options(OverlayBreathingPreview PRIVATE
+        -static
+        -static-libgcc
+        -static-libstdc++
+    )
+endif()
