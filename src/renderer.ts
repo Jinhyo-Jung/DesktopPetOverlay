@@ -77,8 +77,11 @@ const STAGE_EXP_NEXT: Record<Stage, number> = {
 const BUDDY_EMOJI_POOL = ['🐶', '🐰', '🦊', '🐼', '🐸', '🐵'];
 const CHARACTER_STORAGE_KEY = 'desktop-pet-overlay-characters-v1';
 const UI_PANEL_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-visible-v1';
+const UI_PANEL_POSITION_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-position-v1';
 const DRAG_THRESHOLD = 4;
-const PET_NODE_SIZE = 44;
+const PET_NODE_SIZE = 88;
+const MAIN_DEFAULT_X = 412;
+const MAIN_DEFAULT_Y = 12;
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 
@@ -86,6 +89,11 @@ interface PlaygroundPet {
   id: string;
   kind: 'main' | 'buddy';
   emoji: string;
+  x: number;
+  y: number;
+}
+
+interface UiPanelPosition {
   x: number;
   y: number;
 }
@@ -128,6 +136,7 @@ const overlayHintElement = document.getElementById('overlay-hint') as HTMLElemen
 const playgroundElement = document.getElementById('pet-playground') as HTMLElement;
 const petCardElement = document.getElementById('pet-card') as HTMLElement;
 const petUiPanelElement = document.getElementById('pet-ui-panel') as HTMLElement;
+const panelDragHandleElement = document.getElementById('panel-drag-handle') as HTMLElement;
 const activityOptToggleButton = document.getElementById(
   'activity-opt-toggle-btn',
 ) as HTMLButtonElement;
@@ -154,6 +163,7 @@ let dailyActiveSeconds = 0;
 let dailyInputByType = createEmptyInputCounter();
 let showDetailedMetrics = false;
 let uiPanelVisible = loadUiPanelVisible();
+let uiPanelPosition: UiPanelPosition | null = loadUiPanelPosition();
 
 const overlayBridge = window.overlayBridge;
 
@@ -187,8 +197,68 @@ function loadUiPanelVisible(): boolean {
   return window.localStorage.getItem(UI_PANEL_STORAGE_KEY) === '1';
 }
 
+function loadUiPanelPosition(): UiPanelPosition | null {
+  try {
+    const raw = window.localStorage.getItem(UI_PANEL_POSITION_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<UiPanelPosition>;
+    if (!Number.isFinite(parsed.x) || !Number.isFinite(parsed.y)) {
+      return null;
+    }
+    return {
+      x: Math.round(Number(parsed.x)),
+      y: Math.round(Number(parsed.y)),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function persistUiPanelVisible(): void {
   window.localStorage.setItem(UI_PANEL_STORAGE_KEY, uiPanelVisible ? '1' : '0');
+}
+
+function persistUiPanelPosition(): void {
+  if (!uiPanelPosition) {
+    return;
+  }
+  window.localStorage.setItem(UI_PANEL_POSITION_STORAGE_KEY, JSON.stringify(uiPanelPosition));
+}
+
+function clampUiPanelPosition(position: UiPanelPosition): UiPanelPosition {
+  const panelWidth = Math.max(280, petUiPanelElement.offsetWidth || 340);
+  const panelHeight = Math.max(260, petUiPanelElement.offsetHeight || 420);
+  const minX = 8;
+  const minY = 8;
+  const maxX = Math.max(minX, window.innerWidth - panelWidth - 8);
+  const maxY = Math.max(minY, window.innerHeight - panelHeight - 8);
+  return {
+    x: Math.min(Math.max(position.x, minX), maxX),
+    y: Math.min(Math.max(position.y, minY), maxY),
+  };
+}
+
+function getDefaultUiPanelPosition(): UiPanelPosition {
+  const panelWidth = Math.max(280, petUiPanelElement.offsetWidth || 340);
+  const panelHeight = Math.max(260, petUiPanelElement.offsetHeight || 420);
+  return {
+    x: Math.round((window.innerWidth - panelWidth) / 2),
+    y: Math.round(window.innerHeight - panelHeight - 10),
+  };
+}
+
+function applyUiPanelPosition(): void {
+  if (petUiPanelElement.classList.contains('hidden')) {
+    return;
+  }
+
+  const next = clampUiPanelPosition(uiPanelPosition ?? getDefaultUiPanelPosition());
+  uiPanelPosition = next;
+  petUiPanelElement.style.left = `${next.x}px`;
+  petUiPanelElement.style.top = `${next.y}px`;
+  persistUiPanelPosition();
 }
 
 function setUiPanelVisible(visible: boolean): void {
@@ -197,12 +267,11 @@ function setUiPanelVisible(visible: boolean): void {
     petUiPanelElement.classList.remove('hidden');
     petCardElement.classList.remove('compact');
     petCardElement.classList.add('expanded');
-    playgroundElement.classList.add('editing');
+    requestAnimationFrame(() => applyUiPanelPosition());
   } else {
     petUiPanelElement.classList.add('hidden');
     petCardElement.classList.remove('expanded');
     petCardElement.classList.add('compact');
-    playgroundElement.classList.remove('editing');
   }
   persistUiPanelVisible();
 }
@@ -224,7 +293,7 @@ function loadPlaygroundPets(): PlaygroundPet[] {
   try {
     const raw = window.localStorage.getItem(CHARACTER_STORAGE_KEY);
     if (!raw) {
-      return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: 460, y: 250 }];
+      return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: MAIN_DEFAULT_X, y: MAIN_DEFAULT_Y }];
     }
 
     const parsed = JSON.parse(raw) as PlaygroundPet[];
@@ -244,13 +313,13 @@ function loadPlaygroundPets(): PlaygroundPet[] {
         id: 'main',
         kind: 'main',
         emoji: STAGE_FACE_MAP[state.stage],
-        x: 460,
-        y: 250,
+        x: MAIN_DEFAULT_X,
+        y: MAIN_DEFAULT_Y,
       });
     }
     return sanitized;
   } catch {
-    return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: 460, y: 250 }];
+    return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: MAIN_DEFAULT_X, y: MAIN_DEFAULT_Y }];
   }
 }
 
@@ -322,7 +391,7 @@ function renderPlayground(): void {
               deltaX: stepX,
               deltaY: stepY,
               anchorX: pet.x,
-              anchorY: pet.y,
+              anchorY: Math.min(pet.y, 24),
               anchorSize: PET_NODE_SIZE,
               lockToTaskbar: true,
             });
@@ -429,6 +498,7 @@ function updateHelpPanel(): void {
   helpPanelElement.textContent =
     `- 메인 캐릭터 클릭: 설정 UI를 열고/닫습니다.\n` +
     `- 메인 캐릭터 드래그(컴팩트 화면): 캐릭터 기준으로 작업표시줄 위를 따라 이동합니다.\n` +
+    `- 스탯 패널 상단 '패널 이동' 드래그: 패널 위치를 창 안에서 자유롭게 이동합니다.\n` +
     `- ESC: 열린 설정 UI를 닫습니다.\n` +
     `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
     `  (이미 100이라 변화가 없으면 EXP 없음)\n` +
@@ -573,6 +643,38 @@ playButton.addEventListener('click', () => handleAction('play'));
 addCharacterButton.addEventListener('click', addBuddy);
 removeCharacterButton.addEventListener('click', removeBuddy);
 
+panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => {
+  if (clickThroughEnabled || !uiPanelVisible) {
+    return;
+  }
+
+  event.preventDefault();
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const origin = uiPanelPosition ?? getDefaultUiPanelPosition();
+  let moved = false;
+
+  const onPointerMove = (moveEvent: PointerEvent): void => {
+    const deltaX = moveEvent.clientX - startX;
+    const deltaY = moveEvent.clientY - startY;
+    if (Math.abs(deltaX) >= DRAG_THRESHOLD || Math.abs(deltaY) >= DRAG_THRESHOLD) {
+      moved = true;
+    }
+    uiPanelPosition = clampUiPanelPosition({ x: origin.x + deltaX, y: origin.y + deltaY });
+    applyUiPanelPosition();
+  };
+
+  const onPointerUp = (): void => {
+    window.removeEventListener('pointermove', onPointerMove);
+    if (moved) {
+      overlayHintElement.textContent = '스탯 패널 위치 이동 완료';
+    }
+  };
+
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp, { once: true });
+});
+
 clickThroughToggleButton.addEventListener('click', async () => {
   if (!overlayBridge) {
     return;
@@ -631,6 +733,13 @@ window.addEventListener('beforeunload', () => {
   persistSave(state);
   persistPlaygroundPets();
   persistActivitySnapshot(activitySnapshot);
+  persistUiPanelPosition();
+});
+
+window.addEventListener('resize', () => {
+  if (uiPanelVisible) {
+    applyUiPanelPosition();
+  }
 });
 
 setInterval(() => {

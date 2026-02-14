@@ -280,6 +280,7 @@ const registerIpcHandlers = (): void => {
       ? Math.max(16, Math.min(256, Math.round(Number(payload.anchorSize))))
       : 44;
     const lockToTaskbar = payload.lockToTaskbar === true;
+    const normalizedAnchorY = Math.max(0, Math.min(anchorY, 32));
 
     const displayPoint = hasAnchor
       ? {
@@ -294,13 +295,30 @@ const registerIpcHandlers = (): void => {
     const { x: workX, y: workY, width: workWidth, height: workHeight } = display.workArea;
 
     if (hasAnchor) {
-      const minX = workX - anchorX;
-      const maxX = workX + workWidth - anchorX - anchorSize;
-      nextX = Math.min(Math.max(nextX, minX), maxX);
-
       if (lockToTaskbar) {
-        nextY = workY + workHeight - anchorSize - WINDOW_EDGE_MARGIN_Y - anchorY;
+        const displays = screen.getAllDisplays();
+        let globalMinX = Number.POSITIVE_INFINITY;
+        let globalMaxX = Number.NEGATIVE_INFINITY;
+        for (const item of displays) {
+          const area = item.workArea;
+          globalMinX = Math.min(globalMinX, area.x - anchorX);
+          globalMaxX = Math.max(globalMaxX, area.x + area.width - anchorX - anchorSize);
+        }
+
+        if (Number.isFinite(globalMinX) && Number.isFinite(globalMaxX)) {
+          nextX = Math.min(Math.max(nextX, globalMinX), globalMaxX);
+        }
+
+        const targetDisplay = screen.getDisplayNearestPoint({
+          x: Math.round(nextX + anchorX + anchorSize / 2),
+          y: Math.round(displayPoint.y),
+        });
+        const area = targetDisplay.workArea;
+        nextY = area.y + area.height - anchorSize - WINDOW_EDGE_MARGIN_Y - normalizedAnchorY;
       } else {
+        const minX = workX - anchorX;
+        const maxX = workX + workWidth - anchorX - anchorSize;
+        nextX = Math.min(Math.max(nextX, minX), maxX);
         const minY = workY - anchorY;
         const maxY = workY + workHeight - anchorY - anchorSize;
         nextY = Math.min(Math.max(nextY, minY), maxY);
