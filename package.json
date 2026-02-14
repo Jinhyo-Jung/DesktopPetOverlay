@@ -7,7 +7,11 @@
   "private": true,
   "scripts": {
     "start": "electron-forge start",
+    "icon:sync": "node scripts/sync-icon.mjs",
+    "prepackage": "npm run icon:sync",
     "package": "electron-forge package",
+    "postpackage": "node scripts/patch-packaged-exe-icon.mjs",
+    "premake": "npm run icon:sync",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."

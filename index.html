@@ -7,97 +7,96 @@
   </head>
   <body>
     <main class="pet-shell">
-      <section class="pet-card">
-        <div id="pet-face" class="pet-face" aria-hidden="true">🐣</div>
-        <h1>Desktop Pet Overlay</h1>
-        <p id="stage-text" class="stage-text">Stage: Egg</p>
-        <p id="warning-text" class="warning-text">상태 양호</p>
-
-        <section class="overlay-control-panel" aria-label="Overlay controls">
-          <div class="overlay-row">
-            <button id="click-through-toggle-btn" type="button">Click-through: OFF</button>
-            <span id="click-through-status" class="overlay-status">입력 캡처 중</span>
-          </div>
-          <div class="overlay-row">
-            <button id="add-character-btn" type="button">+ 캐릭터</button>
-            <button id="remove-character-btn" type="button">- 캐릭터</button>
-            <span id="character-count" class="overlay-status">캐릭터 1</span>
-          </div>
-          <p id="overlay-hint" class="overlay-hint">캐릭터를 드래그해 위치를 바꾸세요.</p>
-        </section>
-
+      <section id="pet-card" class="pet-card compact">
         <section id="pet-playground" class="pet-playground" aria-label="Pet playground"></section>
 
-        <section class="activity-panel" aria-label="Activity EXP">
-          <div class="activity-row">
-            <button id="activity-opt-toggle-btn" type="button">활동 EXP: ON</button>
-            <button id="activity-checkin-btn" type="button">EXP 획득</button>
-            <button id="activity-reset-btn" type="button">활동 EXP 기록 초기화</button>
+        <section id="pet-ui-panel" class="pet-ui-panel hidden" aria-label="Desktop pet controls">
+          <div id="pet-face" class="pet-face" aria-hidden="true">🥚</div>
+          <h1>Desktop Pet Overlay</h1>
+          <p id="stage-text" class="stage-text">Stage: Egg</p>
+          <p id="warning-text" class="warning-text">상태 양호</p>
+
+          <section class="overlay-control-panel" aria-label="Overlay controls">
+            <div class="overlay-row overlay-row-toggle">
+              <button id="click-through-toggle-btn" type="button">Click-through: OFF</button>
+              <span id="click-through-status" class="overlay-status">입력 캡처 중</span>
+            </div>
+            <div class="overlay-row overlay-row-character">
+              <button id="add-character-btn" type="button">+ 캐릭터</button>
+              <button id="remove-character-btn" type="button">- 캐릭터</button>
+              <span id="character-count" class="overlay-status">캐릭터 1</span>
+            </div>
+            <p id="overlay-hint" class="overlay-hint">메인 캐릭터를 클릭하면 UI가 열리고 다시 클릭하면 닫힙니다.</p>
+          </section>
+
+          <section class="activity-panel" aria-label="Activity EXP">
+            <div class="activity-row">
+              <button id="activity-opt-toggle-btn" type="button">활동 EXP: ON</button>
+              <button id="activity-checkin-btn" type="button">EXP 획득</button>
+            </div>
+            <p id="activity-status" class="activity-status">활동량 기반 EXP 수집 대기 중</p>
+            <p id="activity-metrics" class="activity-status">입력 이벤트 집계: 0</p>
+            <button id="help-btn" type="button" class="help-button">Help</button>
+            <p id="help-panel" class="help-panel hidden">버튼 안내를 불러오는 중...</p>
+          </section>
+
+          <section class="exp-panel" aria-label="Experience">
+            <div class="stat-label-row">
+              <span>EXP</span>
+              <span id="exp-text">0 / 30</span>
+            </div>
+            <div class="stat-bar">
+              <div id="exp-fill" class="stat-fill exp"></div>
+            </div>
+          </section>
+
+          <section class="stats-panel" aria-label="Pet stats">
+            <div class="stat-item">
+              <div class="stat-label-row">
+                <span>Hunger</span>
+                <span id="hunger-value">100</span>
+              </div>
+              <div class="stat-bar">
+                <div id="hunger-fill" class="stat-fill hunger"></div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label-row">
+                <span>Happiness</span>
+                <span id="happiness-value">100</span>
+              </div>
+              <div class="stat-bar">
+                <div id="happiness-fill" class="stat-fill happiness"></div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label-row">
+                <span>Cleanliness</span>
+                <span id="cleanliness-value">100</span>
+              </div>
+              <div class="stat-bar">
+                <div id="cleanliness-fill" class="stat-fill cleanliness"></div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label-row">
+                <span>Health</span>
+                <span id="health-value">100</span>
+              </div>
+              <div class="stat-bar">
+                <div id="health-fill" class="stat-fill health"></div>
+              </div>
+            </div>
+          </section>
+
+          <div class="action-row">
+            <button id="feed-btn" type="button">Feed</button>
+            <button id="clean-btn" type="button">Clean</button>
+            <button id="play-btn" type="button">Play</button>
           </div>
-          <p id="activity-status" class="activity-status">활동량 기반 EXP 수집 대기 중</p>
-          <p id="activity-metrics" class="activity-status">입력 이벤트 집계: 0</p>
-          <button id="help-btn" type="button" class="help-button">Help</button>
-          <p id="help-panel" class="help-panel hidden">
-            버튼 안내를 불러오는 중...
-          </p>
+
+          <p id="meta-text" class="meta-text">EXP 0 · schema v2</p>
         </section>
-
-        <section class="exp-panel" aria-label="Experience">
-          <div class="stat-label-row">
-            <span>EXP</span>
-            <span id="exp-text">0 / 30</span>
-          </div>
-          <div class="stat-bar">
-            <div id="exp-fill" class="stat-fill exp"></div>
-          </div>
-        </section>
-
-        <section class="stats-panel" aria-label="Pet stats">
-          <div class="stat-item">
-            <div class="stat-label-row">
-              <span>Hunger</span>
-              <span id="hunger-value">100</span>
-            </div>
-            <div class="stat-bar">
-              <div id="hunger-fill" class="stat-fill hunger"></div>
-            </div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label-row">
-              <span>Happiness</span>
-              <span id="happiness-value">100</span>
-            </div>
-            <div class="stat-bar">
-              <div id="happiness-fill" class="stat-fill happiness"></div>
-            </div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label-row">
-              <span>Cleanliness</span>
-              <span id="cleanliness-value">100</span>
-            </div>
-            <div class="stat-bar">
-              <div id="cleanliness-fill" class="stat-fill cleanliness"></div>
-            </div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label-row">
-              <span>Health</span>
-              <span id="health-value">100</span>
-            </div>
-            <div class="stat-bar">
-              <div id="health-fill" class="stat-fill health"></div>
-            </div>
-          </div>
-        </section>
-
-        <div class="action-row">
-          <button id="feed-btn" type="button">Feed</button>
-          <button id="clean-btn" type="button">Clean</button>
-          <button id="play-btn" type="button">Play</button>
-        </div>
-
-        <p id="meta-text" class="meta-text">EXP 0 · schema v2</p>
       </section>
     </main>
     <script type="module" src="/src/renderer.ts"></script>

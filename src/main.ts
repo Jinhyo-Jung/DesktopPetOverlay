@@ -26,11 +26,11 @@ const DEFAULT_PREFERENCES: OverlayPreferences = {
 
 const CLICK_THROUGH_TOGGLE_SHORTCUT = 'CommandOrControl+Alt+Shift+O';
 const CLICK_THROUGH_SHORTCUT_LABEL = 'Ctrl+Alt+Shift+O';
-const WINDOW_WIDTH = 380;
-const WINDOW_HEIGHT = 640;
-const WINDOW_MIN_WIDTH = 360;
-const WINDOW_MIN_HEIGHT = 560;
-const APP_ICON_PATH = path.join(app.getAppPath(), 'source', 'exe_icon3.ico');
+const WINDOW_WIDTH = 520;
+const WINDOW_HEIGHT = 320;
+const WINDOW_MIN_WIDTH = 420;
+const WINDOW_MIN_HEIGHT = 280;
+const APP_USER_MODEL_ID = 'com.jinhy.desktoppetoverlay';
 
 let mainWindow: BrowserWindow | null = null;
 let overlayPreferences: OverlayPreferences = { ...DEFAULT_PREFERENCES };
@@ -148,7 +148,32 @@ const clampWindowPosition = (): void => {
   }
 };
 
+const getDefaultWindowPosition = (): { x: number; y: number } => {
+  const display = screen.getPrimaryDisplay();
+  const { x, y, width, height } = display.workArea;
+  return {
+    x: Math.round(x + width - WINDOW_WIDTH - 24),
+    y: Math.round(y + height - WINDOW_HEIGHT - 12),
+  };
+};
+
+const resolveWindowIconPath = (): string => {
+  const packagedIcoPath = path.join(process.resourcesPath, 'app.asar', 'source', 'exe_icon3.ico');
+  const devIcoPath = path.join(app.getAppPath(), 'source', 'exe_icon3.ico');
+  const devPngPath = path.join(app.getAppPath(), 'source', 'exe_icon3.png');
+
+  if (app.isPackaged && fs.existsSync(packagedIcoPath)) {
+    return packagedIcoPath;
+  }
+  if (fs.existsSync(devIcoPath)) {
+    return devIcoPath;
+  }
+  return devPngPath;
+};
+
 const createWindow = () => {
+  const defaultPosition = getDefaultWindowPosition();
+  const iconPath = resolveWindowIconPath();
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
@@ -159,12 +184,12 @@ const createWindow = () => {
     alwaysOnTop: true,
     resizable: false,
     hasShadow: false,
-    icon: APP_ICON_PATH,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
-    x: overlayPreferences.x,
-    y: overlayPreferences.y,
+    x: overlayPreferences.x ?? defaultPosition.x,
+    y: overlayPreferences.y ?? defaultPosition.y,
   });
 
   // and load the index.html of the app.
@@ -199,6 +224,7 @@ const registerIpcHandlers = (): void => {
 };
 
 app.on('ready', () => {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
   overlayPreferences = readOverlayPreferences();
   clampWindowPosition();
   registerIpcHandlers();

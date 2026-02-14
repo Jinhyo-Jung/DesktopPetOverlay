@@ -1,5 +1,14 @@
 # CHANGE_LOG
 
+## 2026-02-14T23:21:59+09:00
+- 메인 캐릭터 클릭으로 설정 UI를 열고/닫는 오버레이 상호작용을 추가하고, 기본 상태를 캐릭터 중심(컴팩트) 화면으로 전환했다.
+- `index.html`, `src/index.css`, `src/renderer.ts`를 갱신해 캐릭터 이동 영역을 창 전체로 확장하고 UI 패널을 팝업 형태로 재구성했다.
+- `활동 EXP 기록 초기화` 버튼과 관련 렌더러 로직을 제거해 불필요한 리셋 경로를 정리했다.
+- `EXP 획득` 버튼의 쿨다운 표기를 버튼 라벨에서 제거하고, 쿨다운 중 클릭 시 남은 초를 안내 문구로 표시하도록 수정했다.
+- `src/main.ts`에서 기본 창 시작 위치를 작업 표시줄 위(화면 하단 우측)로 보정하고 Windows AppUserModelID를 지정해 앱 아이콘 반영 신뢰도를 높였다.
+- `scripts/sync-icon.mjs`, `scripts/patch-packaged-exe-icon.mjs`를 추가하고 `package.json`에 pre/post package 훅을 연결해 `source/exe_icon3.png` 기반 아이콘 동기화 및 exe 아이콘 재주입을 자동화했다.
+- `docs/guides/DesktopPetOverlay 사용 가이드.md`를 최신 UI/버튼 정책 기준으로 재작성했다.
+
 ## 2026-02-14T23:03:50+09:00
 - `src/petState.ts`에 액션 유효성 판정(`isActionEffective`)을 추가하고 `Feed/Clean/Play`로 실제 스탯 변화가 없을 때 EXP/횟수 증가가 발생하지 않도록 방어 로직을 적용했다.
 - `src/renderer.ts`에서 액션 버튼을 유효성 기반으로 비활성화하고, 무효 액션 클릭 시 안내 문구를 표시해 무한 EXP 획득 경로를 차단했다.

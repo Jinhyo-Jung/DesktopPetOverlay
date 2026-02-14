@@ -22,7 +22,6 @@ import {
   grantFallbackExp,
   loadActivitySnapshot,
   persistActivitySnapshot,
-  resetActivityContribution,
   rolloverSnapshot,
   setActivityEnabled,
 } from './activityExp';
@@ -69,6 +68,7 @@ const STAGE_EXP_NEXT: Record<Stage, number> = {
 
 const BUDDY_EMOJI_POOL = ['🐶', '🐰', '🦊', '🐼', '🐸', '🐵'];
 const CHARACTER_STORAGE_KEY = 'desktop-pet-overlay-characters-v1';
+const UI_PANEL_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-visible-v1';
 const DRAG_THRESHOLD = 4;
 const PET_NODE_SIZE = 44;
 
@@ -118,13 +118,14 @@ const removeCharacterButton = document.getElementById('remove-character-btn') as
 const characterCountElement = document.getElementById('character-count') as HTMLElement;
 const overlayHintElement = document.getElementById('overlay-hint') as HTMLElement;
 const playgroundElement = document.getElementById('pet-playground') as HTMLElement;
+const petCardElement = document.getElementById('pet-card') as HTMLElement;
+const petUiPanelElement = document.getElementById('pet-ui-panel') as HTMLElement;
 const activityOptToggleButton = document.getElementById(
   'activity-opt-toggle-btn',
 ) as HTMLButtonElement;
 const activityCheckinButton = document.getElementById(
   'activity-checkin-btn',
 ) as HTMLButtonElement;
-const activityResetButton = document.getElementById('activity-reset-btn') as HTMLButtonElement;
 const activityStatusElement = document.getElementById('activity-status') as HTMLElement;
 const activityMetricsElement = document.getElementById('activity-metrics') as HTMLElement;
 const helpButton = document.getElementById('help-btn') as HTMLButtonElement;
@@ -144,6 +145,7 @@ let sampleInputByType = createEmptyInputCounter();
 let dailyActiveSeconds = 0;
 let dailyInputByType = createEmptyInputCounter();
 let showDetailedMetrics = false;
+let uiPanelVisible = loadUiPanelVisible();
 
 const overlayBridge = window.overlayBridge;
 
@@ -171,6 +173,30 @@ function getCooldownRemainingMs(lastFallbackAt: string | null): number {
 
   const elapsed = Date.now() - Date.parse(lastFallbackAt);
   return Math.max(0, FALLBACK_COOLDOWN_MS - elapsed);
+}
+
+function loadUiPanelVisible(): boolean {
+  return window.localStorage.getItem(UI_PANEL_STORAGE_KEY) === '1';
+}
+
+function persistUiPanelVisible(): void {
+  window.localStorage.setItem(UI_PANEL_STORAGE_KEY, uiPanelVisible ? '1' : '0');
+}
+
+function setUiPanelVisible(visible: boolean): void {
+  uiPanelVisible = visible;
+  if (visible) {
+    petUiPanelElement.classList.remove('hidden');
+    petCardElement.classList.remove('compact');
+    petCardElement.classList.add('expanded');
+    playgroundElement.classList.add('editing');
+  } else {
+    petUiPanelElement.classList.add('hidden');
+    petCardElement.classList.remove('expanded');
+    petCardElement.classList.add('compact');
+    playgroundElement.classList.remove('editing');
+  }
+  persistUiPanelVisible();
 }
 
 function formatDuration(seconds: number): string {
@@ -289,7 +315,14 @@ function renderPlayground(): void {
         node.classList.remove('dragging');
         if (!moved) {
           selectedPetId = pet.id;
-          overlayHintElement.textContent = '캐릭터 선택 완료';
+          if (pet.kind === 'main') {
+            setUiPanelVisible(!uiPanelVisible);
+            overlayHintElement.textContent = uiPanelVisible
+              ? '메인 UI를 표시했습니다.'
+              : '메인 UI를 숨겼습니다.';
+          } else {
+            overlayHintElement.textContent = '캐릭터 선택 완료';
+          }
         } else {
           overlayHintElement.textContent = '드래그 위치 저장 완료';
         }
@@ -339,12 +372,8 @@ function updateActivityUI(): void {
   }
 
   activityOptToggleButton.textContent = activitySnapshot.enabled ? '활동 EXP: ON' : '활동 EXP: OFF';
-  const cooldownRemainingMs = getCooldownRemainingMs(activitySnapshot.lastFallbackAt);
-  activityCheckinButton.disabled = cooldownRemainingMs > 0;
-  activityCheckinButton.textContent =
-    cooldownRemainingMs > 0
-      ? `EXP 획득 (${Math.ceil(cooldownRemainingMs / 1_000)}s)`
-      : 'EXP 획득';
+  activityCheckinButton.disabled = false;
+  activityCheckinButton.textContent = 'EXP 획득';
 
   const samplePreviewExp = computeActivityExp(sampleActiveSeconds, sampleInputEvents);
   const sampleInputTotal = sumInputCounter(sampleInputByType);
@@ -366,11 +395,11 @@ function updateActivityUI(): void {
 
 function updateHelpPanel(): void {
   helpPanelElement.textContent =
+    `- 메인 캐릭터 클릭: 설정 UI를 열고/닫습니다.\n` +
     `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
     `  (이미 100이라 변화가 없으면 EXP 없음)\n` +
     `- 활동 EXP(자동): 5분 샘플마다 시간/입력 집계로 자동 획득됩니다.\n` +
     `- EXP 획득(수동): 5분 쿨다운마다 +2 EXP를 받습니다.\n` +
-    `- 활동 EXP 기록 초기화: 활동 시스템으로 받은 누적 EXP 기록을 초기화하고 캐릭터 EXP에서 차감합니다.\n` +
     `- EXP 숫자(예: 10 / 30) 클릭: 입력 이벤트별 집계와 누적 시간을 표시합니다.`;
 }
 
@@ -555,22 +584,12 @@ activityCheckinButton.addEventListener('click', () => {
   }
 
   if (result.reason === 'fallback-cooldown') {
-    overlayHintElement.textContent = 'EXP 획득은 5분 간격으로 사용할 수 있습니다.';
+    const remainingSeconds = Math.max(
+      1,
+      Math.ceil(getCooldownRemainingMs(activitySnapshot.lastFallbackAt) / 1_000),
+    );
+    overlayHintElement.textContent = `EXP 획득은 ${remainingSeconds}초 뒤에 다시 클릭할 수 있습니다.`;
   }
-  updateActivityUI();
-});
-
-activityResetButton.addEventListener('click', () => {
-  const resetResult = resetActivityContribution(activitySnapshot, new Date());
-  activitySnapshot = resetResult.snapshot;
-  persistActivitySnapshot(activitySnapshot);
-  if (resetResult.expDelta !== 0) {
-    state = applyExpDelta(state, resetResult.expDelta);
-    overlayHintElement.textContent = '활동 기반 누적 EXP를 초기화했습니다.';
-    render(state);
-    return;
-  }
-  overlayHintElement.textContent = '초기화할 활동 EXP가 없습니다.';
   updateActivityUI();
 });
 
@@ -622,5 +641,6 @@ helpButton.addEventListener('click', () => {
 });
 
 updateHelpPanel();
+setUiPanelVisible(uiPanelVisible);
 bindActivitySignalEvents();
 render(state);
