@@ -28,6 +28,25 @@
 
         <section id="pet-playground" class="pet-playground" aria-label="Pet playground"></section>
 
+        <section class="activity-panel" aria-label="Activity EXP">
+          <div class="activity-row">
+            <button id="activity-opt-toggle-btn" type="button">활동 EXP: ON</button>
+            <button id="activity-checkin-btn" type="button">수동 체크인</button>
+            <button id="activity-reset-btn" type="button">활동 EXP 리셋</button>
+          </div>
+          <p id="activity-status" class="activity-status">활동량 기반 EXP 수집 대기 중</p>
+        </section>
+
+        <section class="exp-panel" aria-label="Experience">
+          <div class="stat-label-row">
+            <span>EXP</span>
+            <span id="exp-text">0 / 30</span>
+          </div>
+          <div class="stat-bar">
+            <div id="exp-fill" class="stat-fill exp"></div>
+          </div>
+        </section>
+
         <section class="stats-panel" aria-label="Pet stats">
           <div class="stat-item">
             <div class="stat-label-row">

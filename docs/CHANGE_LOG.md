@@ -1,5 +1,13 @@
 # CHANGE_LOG
 
+## 2026-02-14T19:45:15+09:00
+- PC 활동량 기반 EXP 연동을 위해 `src/activityExp.ts`를 추가하고 최소 수집(활성 시간/입력 이벤트 집계), 일일 상한, 수동 체크인 대체 경로를 구현했다.
+- `src/renderer.ts`에 활동 EXP 토글/리셋/체크인 UI 동작과 5분 샘플링 환산(`floor(activeMinutes * 0.4 + inputEvents / 140)`) 로직을 연결했다.
+- `src/petState.ts`에 EXP 증감 공용 함수(`applyExpDelta`)를 추가해 활동 EXP 리셋 시 누적 활동 EXP 차감이 가능하도록 정리했다.
+- `index.html`, `src/index.css`를 갱신해 활동 EXP 제어 패널과 EXP 진행 표시를 추가했다.
+- 정책 문서 `docs/PC 활동 EXP 정책.md`를 신설해 개인정보 원칙, 수집 항목, 환산식, 상한, 예외 처리를 결론 우선 형식으로 정리했다.
+- `pc-activity-exp-policy` 및 `pet-balance-simulator` 스크립트를 실행해 EXP 환산/기존 스탯 밸런스 결과를 점검했다.
+
 ## 2026-02-14T19:38:18+09:00
 - 오버레이 고급 기능 1차로 클릭-통과 토글, 단축키 복구 경로(`Ctrl+Shift+O`), 창 위치/토글 상태 영속화를 구현했다.
 - `src/main.ts`에 오버레이 IPC(`overlay:get-state`, `overlay:set-click-through`, `overlay:toggle-click-through`)와 글로벌 단축키 처리, 위치 저장 로직을 추가했다.

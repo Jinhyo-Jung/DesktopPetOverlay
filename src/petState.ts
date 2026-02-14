@@ -294,6 +294,22 @@ export function runTick(current: PetState): PetState {
   return toState(next);
 }
 
+export function applyExpDelta(current: PetState, expDelta: number): PetState {
+  const nowIso = new Date().toISOString();
+  const base = toSave(current);
+  const nextExp = Math.max(0, base.exp + Math.floor(expDelta));
+
+  const next: PetSave = {
+    ...base,
+    exp: nextExp,
+    stage: deriveStage(nextExp),
+    lastSeenTimestamp: nowIso,
+  };
+
+  persistSave(next);
+  return toState(next);
+}
+
 export function applyAction(current: PetState, action: ActionType): PetState {
   const effects = ACTION_EFFECTS[action];
   const nowIso = new Date().toISOString();

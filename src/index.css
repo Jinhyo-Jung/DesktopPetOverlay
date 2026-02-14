@@ -109,6 +109,28 @@ h1 {
   touch-action: none;
 }
 
+.activity-panel {
+  margin-bottom: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.activity-status {
+  margin: 0;
+  font-size: 11px;
+  color: #4a4a4a;
+}
+
+.exp-panel {
+  margin-bottom: 10px;
+}
+
 .playground-pet {
   position: absolute;
   width: 44px;
@@ -178,6 +200,10 @@ h1 {
 
 .stat-fill.health {
   background: linear-gradient(90deg, #74d783, #47bf6d);
+}
+
+.stat-fill.exp {
+  background: linear-gradient(90deg, #bc8cff, #8066ff);
 }
 
 .action-row {
