@@ -1,5 +1,11 @@
 # CHANGE_LOG
 
+## 2026-02-14T19:52:48+09:00
+- `release-packaging-windows` 시나리오를 수행해 `npm run lint`와 Windows 타깃 패키징(`npm run package -- --platform=win32 --arch=x64`)을 실행했다.
+- 산출물 `out/DesktopPetOverlay-win32-x64/DesktopPetOverlay.exe`와 `resources/app.asar`의 경로/크기/SHA-256을 검증했다.
+- `package_windows.sh`는 `rpmbuild` 미설치로 중단되었고, Squirrel 타깃 `make`는 `Mono/Wine` 미설치로 실패해 설치형 패키지는 미생성 상태로 확인했다.
+- 릴리즈 상태 정리를 위해 `docs/릴리즈 준비 결과.md` 문서를 추가했다.
+
 ## 2026-02-14T19:45:15+09:00
 - PC 활동량 기반 EXP 연동을 위해 `src/activityExp.ts`를 추가하고 최소 수집(활성 시간/입력 이벤트 집계), 일일 상한, 수동 체크인 대체 경로를 구현했다.
 - `src/renderer.ts`에 활동 EXP 토글/리셋/체크인 UI 동작과 5분 샘플링 환산(`floor(activeMinutes * 0.4 + inputEvents / 140)`) 로직을 연결했다.
