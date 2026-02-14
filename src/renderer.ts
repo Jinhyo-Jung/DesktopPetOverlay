@@ -36,7 +36,14 @@ interface OverlayBridge {
   getState: () => Promise<OverlayState>;
   setClickThrough: (enabled: boolean) => Promise<boolean>;
   toggleClickThrough: () => Promise<boolean>;
-  moveWindowBy: (deltaX: number, deltaY: number) => Promise<void>;
+  moveWindowBy: (payload: {
+    deltaX: number;
+    deltaY: number;
+    anchorX?: number;
+    anchorY?: number;
+    anchorSize?: number;
+    lockToTaskbar?: boolean;
+  }) => Promise<void>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
 }
 
@@ -217,7 +224,7 @@ function loadPlaygroundPets(): PlaygroundPet[] {
   try {
     const raw = window.localStorage.getItem(CHARACTER_STORAGE_KEY);
     if (!raw) {
-      return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: 132, y: 38 }];
+      return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: 460, y: 250 }];
     }
 
     const parsed = JSON.parse(raw) as PlaygroundPet[];
@@ -237,13 +244,13 @@ function loadPlaygroundPets(): PlaygroundPet[] {
         id: 'main',
         kind: 'main',
         emoji: STAGE_FACE_MAP[state.stage],
-        x: 132,
-        y: 38,
+        x: 460,
+        y: 250,
       });
     }
     return sanitized;
   } catch {
-    return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: 132, y: 38 }];
+    return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: 460, y: 250 }];
   }
 }
 
@@ -311,7 +318,14 @@ function renderPlayground(): void {
           previousX = moveEvent.clientX;
           previousY = moveEvent.clientY;
           if (stepX !== 0 || stepY !== 0) {
-            void overlayBridge?.moveWindowBy(stepX, stepY);
+            void overlayBridge?.moveWindowBy({
+              deltaX: stepX,
+              deltaY: stepY,
+              anchorX: pet.x,
+              anchorY: pet.y,
+              anchorSize: PET_NODE_SIZE,
+              lockToTaskbar: true,
+            });
           }
           return;
         }
@@ -414,7 +428,7 @@ function updateActivityUI(): void {
 function updateHelpPanel(): void {
   helpPanelElement.textContent =
     `- 메인 캐릭터 클릭: 설정 UI를 열고/닫습니다.\n` +
-    `- 메인 캐릭터 드래그(컴팩트 화면): 창 자체가 이동합니다.\n` +
+    `- 메인 캐릭터 드래그(컴팩트 화면): 캐릭터 기준으로 작업표시줄 위를 따라 이동합니다.\n` +
     `- ESC: 열린 설정 UI를 닫습니다.\n` +
     `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
     `  (이미 100이라 변화가 없으면 EXP 없음)\n` +
