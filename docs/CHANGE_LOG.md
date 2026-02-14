@@ -1,5 +1,10 @@
 # CHANGE_LOG
 
+## 2026-02-14T21:36:54+09:00
+- 문서 폴더 과밀 해소를 위해 `docs`를 카테고리 구조(`requirements`, `design`, `guides`, `policies`, `release`)로 재분류하고 기존 문서를 각 하위 폴더로 이동했다.
+- 문서 인덱스 `docs/README.md`를 추가해 카테고리 기준, 현재 문서 맵, 기준 경로를 한눈에 확인할 수 있도록 정리했다.
+- `docs/guides/OverlayBreathingPreview 실행 가이드.md`를 신규 작성해 목적, 빌드/실행 방법, 산출물 확장자, 정상 동작 기준, 문제 해결 체크포인트를 명시했다.
+
 ## 2026-02-14T21:27:19+09:00
 - 빌드 산출물 폴더에서 실행 시 이미지 경로 문제를 방지하기 위해 `CMakeLists.txt`에 POST_BUILD 복사 단계를 추가해 `build-mingw/source/01_cat.png`가 자동 생성되도록 조정했다.
 - 이 변경으로 `OverlayBreathingPreview.exe`를 더블클릭 실행해도 `./source/01_cat.png` 경로가 유효하도록 보장했다.
