@@ -14,6 +14,12 @@ interface OverlayPreferences {
   clickThroughEnabled: boolean;
 }
 
+interface OverlayState {
+  clickThroughEnabled: boolean;
+  shortcut: string;
+  shortcutRegistered: boolean;
+}
+
 const DEFAULT_PREFERENCES: OverlayPreferences = {
   clickThroughEnabled: false,
 };
@@ -23,6 +29,7 @@ const CLICK_THROUGH_SHORTCUT_LABEL = 'Ctrl+Shift+O';
 
 let mainWindow: BrowserWindow | null = null;
 let overlayPreferences: OverlayPreferences = { ...DEFAULT_PREFERENCES };
+let clickThroughShortcutRegistered = false;
 
 const getPreferencesPath = (): string =>
   path.join(app.getPath('userData'), 'overlay-preferences.json');
@@ -53,19 +60,55 @@ const writeOverlayPreferences = (): void => {
   }
 };
 
-const applyClickThrough = (enabled: boolean): boolean => {
+const getOverlayState = (): OverlayState => ({
+  clickThroughEnabled: overlayPreferences.clickThroughEnabled,
+  shortcut: CLICK_THROUGH_SHORTCUT_LABEL,
+  shortcutRegistered: clickThroughShortcutRegistered,
+});
+
+const emitOverlayState = (): void => {
   if (!mainWindow || mainWindow.isDestroyed()) {
-    return overlayPreferences.clickThroughEnabled;
+    return;
   }
 
-  overlayPreferences.clickThroughEnabled = enabled;
-  mainWindow.setIgnoreMouseEvents(enabled, { forward: enabled });
+  mainWindow.webContents.send('overlay:click-through-changed', getOverlayState());
+};
+
+const registerOverlayShortcut = (): boolean => {
+  if (
+    clickThroughShortcutRegistered ||
+    globalShortcut.isRegistered(CLICK_THROUGH_TOGGLE_SHORTCUT)
+  ) {
+    clickThroughShortcutRegistered = true;
+    return true;
+  }
+
+  clickThroughShortcutRegistered = globalShortcut.register(
+    CLICK_THROUGH_TOGGLE_SHORTCUT,
+    () => {
+      applyClickThrough(!overlayPreferences.clickThroughEnabled);
+    },
+  );
+
+  return clickThroughShortcutRegistered;
+};
+
+const applyClickThrough = (enabled: boolean): boolean => {
+  if (enabled && !clickThroughShortcutRegistered) {
+    registerOverlayShortcut();
+  }
+
+  const nextEnabled = enabled && clickThroughShortcutRegistered;
+  overlayPreferences.clickThroughEnabled = nextEnabled;
   writeOverlayPreferences();
-  mainWindow.webContents.send('overlay:click-through-changed', {
-    clickThroughEnabled: enabled,
-    shortcut: CLICK_THROUGH_SHORTCUT_LABEL,
-  });
-  return enabled;
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return nextEnabled;
+  }
+
+  mainWindow.setIgnoreMouseEvents(nextEnabled, { forward: nextEnabled });
+  emitOverlayState();
+  return nextEnabled;
 };
 
 const persistWindowPosition = (): void => {
@@ -117,10 +160,7 @@ const createWindow = () => {
 };
 
 const registerIpcHandlers = (): void => {
-  ipcMain.handle('overlay:get-state', () => ({
-    clickThroughEnabled: overlayPreferences.clickThroughEnabled,
-    shortcut: CLICK_THROUGH_SHORTCUT_LABEL,
-  }));
+  ipcMain.handle('overlay:get-state', () => getOverlayState());
 
   ipcMain.handle('overlay:set-click-through', (_event, enabled: unknown) =>
     applyClickThrough(enabled === true),
@@ -131,17 +171,11 @@ const registerIpcHandlers = (): void => {
   );
 };
 
-const registerOverlayShortcut = (): void => {
-  globalShortcut.register(CLICK_THROUGH_TOGGLE_SHORTCUT, () => {
-    applyClickThrough(!overlayPreferences.clickThroughEnabled);
-  });
-};
-
 app.on('ready', () => {
   overlayPreferences = readOverlayPreferences();
   registerIpcHandlers();
-  createWindow();
   registerOverlayShortcut();
+  createWindow();
 });
 
 app.on('window-all-closed', () => {
@@ -153,6 +187,20 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+app.on('browser-window-focus', () => {
+  const wasRegistered = clickThroughShortcutRegistered;
+  registerOverlayShortcut();
+
+  if (!clickThroughShortcutRegistered && overlayPreferences.clickThroughEnabled) {
+    applyClickThrough(false);
+    return;
+  }
+
+  if (wasRegistered !== clickThroughShortcutRegistered) {
+    emitOverlayState();
   }
 });
 

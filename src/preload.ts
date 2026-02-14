@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 interface OverlayState {
   clickThroughEnabled: boolean;
   shortcut: string;
+  shortcutRegistered: boolean;
 }
 
 interface OverlayBridge {

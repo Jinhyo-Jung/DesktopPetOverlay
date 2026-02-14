@@ -1,5 +1,13 @@
 # CHANGE_LOG
 
+## 2026-02-14T22:00:19+09:00
+- 패키징 exe 환경에서 `Ctrl+Shift+O` 복구 실패 시 UI 잠금이 발생하던 구조를 수정해, 단축키 등록 실패 시 클릭 통과 ON 전환 자체를 차단하도록 변경했다.
+- `src/main.ts`에 단축키 등록 상태(`shortcutRegistered`)를 추가하고 `globalShortcut.register` 성공 여부를 추적하도록 보강했으며, 등록 실패 상태를 IPC(`overlay:get-state`, `overlay:click-through-changed`)로 렌더러에 전달하도록 확장했다.
+- `src/main.ts`에서 앱 시작 순서를 `단축키 등록 -> 윈도우 생성`으로 조정하고, 포커스 시 단축키 재등록을 시도해 패키징 실행 중 등록 상태 변동에도 복구 경로를 유지하도록 했다.
+- `src/preload.ts`, `src/renderer.ts`에 `shortcutRegistered` 상태를 연결해 단축키 등록 실패 시 "등록 실패" 안내를 UI에 표시하고 클릭 통과 활성화 거부 이유를 즉시 확인 가능하게 했다.
+- 검증으로 `overlay-window-spec`의 `check_overlay_flags.sh`를 실행해 필수 윈도우 플래그를 확인했고, `npm run make`를 재실행해 최신 산출물(`out/make`) 생성을 확인했다.
+- 환경 이슈로 WSL에서는 Node 실행이 차단되어(`WSL 1 is not supported`), 릴리스 검증 일부를 Windows 셸 fallback으로 수행했다. `npm run lint`는 `build-mingw/CMakeFiles/OverlayBreathingPreview.dir/compiler_depend.ts` 파싱 오류(기존 생성물 영향)로 실패했다.
+
 ## 2026-02-14T21:36:54+09:00
 - 문서 폴더 과밀 해소를 위해 `docs`를 카테고리 구조(`requirements`, `design`, `guides`, `policies`, `release`)로 재분류하고 기존 문서를 각 하위 폴더로 이동했다.
 - 문서 인덱스 `docs/README.md`를 추가해 카테고리 기준, 현재 문서 맵, 기준 경로를 한눈에 확인할 수 있도록 정리했다.

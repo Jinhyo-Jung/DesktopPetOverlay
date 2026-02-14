@@ -29,6 +29,7 @@ import {
 interface OverlayState {
   clickThroughEnabled: boolean;
   shortcut: string;
+  shortcutRegistered: boolean;
 }
 
 interface OverlayBridge {
@@ -128,6 +129,7 @@ const activityStatusElement = document.getElementById('activity-status') as HTML
 let state: PetState = loadState();
 let clickThroughEnabled = false;
 let clickThroughShortcut = 'Ctrl+Shift+O';
+let clickThroughShortcutRegistered = true;
 let playgroundPets: PlaygroundPet[] = loadPlaygroundPets();
 let selectedPetId = playgroundPets[0]?.id ?? 'main';
 
@@ -262,12 +264,25 @@ function renderPlayground(): void {
 }
 
 function updateClickThroughUI(): void {
+  if (!clickThroughShortcutRegistered) {
+    clickThroughToggleButton.textContent = 'Click-through: OFF';
+    clickThroughStatusElement.textContent = `단축키(${clickThroughShortcut}) 등록 실패`;
+    return;
+  }
+
   clickThroughToggleButton.textContent = clickThroughEnabled
     ? 'Click-through: ON'
     : 'Click-through: OFF';
   clickThroughStatusElement.textContent = clickThroughEnabled
     ? `통과 중 · ${clickThroughShortcut}로 복구`
     : '입력 캡처 중';
+}
+
+function applyOverlayState(overlayState: OverlayState): void {
+  clickThroughEnabled = overlayState.clickThroughEnabled;
+  clickThroughShortcut = overlayState.shortcut;
+  clickThroughShortcutRegistered = overlayState.shortcutRegistered;
+  updateClickThroughUI();
 }
 
 function updateActivityUI(): void {
@@ -418,8 +433,17 @@ clickThroughToggleButton.addEventListener('click', async () => {
   if (!overlayBridge) {
     return;
   }
-  clickThroughEnabled = await overlayBridge.toggleClickThrough();
-  updateClickThroughUI();
+
+  await overlayBridge.toggleClickThrough();
+  try {
+    applyOverlayState(await overlayBridge.getState());
+    if (!clickThroughShortcutRegistered) {
+      overlayHintElement.textContent =
+        `단축키(${clickThroughShortcut}) 등록 실패로 클릭 통과를 활성화할 수 없습니다.`;
+    }
+  } catch {
+    updateClickThroughUI();
+  }
 });
 
 activityOptToggleButton.addEventListener('click', () => {
@@ -493,19 +517,13 @@ setInterval(() => {
 if (overlayBridge) {
   overlayBridge
     .getState()
-    .then((overlayState) => {
-      clickThroughEnabled = overlayState.clickThroughEnabled;
-      clickThroughShortcut = overlayState.shortcut;
-      updateClickThroughUI();
-    })
+    .then((overlayState) => applyOverlayState(overlayState))
     .catch(() => {
       updateClickThroughUI();
     });
 
   const unsubscribe = overlayBridge.onClickThroughChanged((overlayState) => {
-    clickThroughEnabled = overlayState.clickThroughEnabled;
-    clickThroughShortcut = overlayState.shortcut;
-    updateClickThroughUI();
+    applyOverlayState(overlayState);
   });
 
   window.addEventListener('beforeunload', unsubscribe, { once: true });
