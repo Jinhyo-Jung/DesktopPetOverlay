@@ -1,0 +1,4 @@
+interface:
+  display_name: "Save Migration Guard"
+  short_description: "Keep save schema changes backward compatible"
+  default_prompt: "Use $save-migration-guard to add safe save-data migration steps."

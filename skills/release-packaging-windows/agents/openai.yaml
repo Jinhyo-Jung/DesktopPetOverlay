@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Packaging Windows"
+  short_description: "Package and validate Windows release artifacts"
+  default_prompt: "Use $release-packaging-windows to package and validate a Windows release build."

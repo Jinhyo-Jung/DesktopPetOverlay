@@ -1,0 +1,4 @@
+interface:
+  display_name: "PC Activity EXP Policy"
+  short_description: "Define privacy-safe activity-to-EXP rules"
+  default_prompt: "Use $pc-activity-exp-policy to define EXP rules with privacy constraints."

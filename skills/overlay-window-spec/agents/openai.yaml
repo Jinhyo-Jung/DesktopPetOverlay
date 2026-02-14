@@ -1,0 +1,4 @@
+interface:
+  display_name: "Overlay Window Spec"
+  short_description: "Implement and verify Electron overlay behaviors"
+  default_prompt: "Use $overlay-window-spec to implement transparent, always-on-top, and click-through behavior."

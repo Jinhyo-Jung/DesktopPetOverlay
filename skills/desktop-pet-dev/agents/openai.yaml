@@ -1,0 +1,4 @@
+interface:
+  display_name: "Desktop Pet Dev"
+  short_description: "WSL workflow for DesktopPetOverlay development"
+  default_prompt: "Use $desktop-pet-dev to run the standard WSL development workflow for this repository."

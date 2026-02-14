@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pet Balance Simulator"
+  short_description: "Tune stat decay, recovery, and evolution pacing"
+  default_prompt: "Use $pet-balance-simulator to evaluate stat balance with a quick simulation."
