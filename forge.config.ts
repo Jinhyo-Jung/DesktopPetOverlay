@@ -9,11 +9,12 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import path from 'node:path';
 
 const windowsIconPath = path.resolve(__dirname, 'source', 'exe_icon3.ico');
+const windowsIconBasePath = path.resolve(__dirname, 'source', 'exe_icon3');
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    icon: windowsIconPath,
+    icon: windowsIconBasePath,
   },
   rebuildConfig: {},
   makers: [

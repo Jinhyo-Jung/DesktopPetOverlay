@@ -133,6 +133,12 @@ h1 {
   margin-bottom: 10px;
 }
 
+#exp-text {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .playground-pet {
   position: absolute;
   width: 44px;

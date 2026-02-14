@@ -30,6 +30,7 @@ const WINDOW_WIDTH = 380;
 const WINDOW_HEIGHT = 640;
 const WINDOW_MIN_WIDTH = 360;
 const WINDOW_MIN_HEIGHT = 560;
+const APP_ICON_PATH = path.join(app.getAppPath(), 'source', 'exe_icon3.ico');
 
 let mainWindow: BrowserWindow | null = null;
 let overlayPreferences: OverlayPreferences = { ...DEFAULT_PREFERENCES };
@@ -158,7 +159,7 @@ const createWindow = () => {
     alwaysOnTop: true,
     resizable: false,
     hasShadow: false,
-    icon: path.join(app.getAppPath(), 'source', 'exe_icon3.png'),
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },

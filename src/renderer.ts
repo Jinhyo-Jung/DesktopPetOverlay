@@ -11,11 +11,11 @@ import {
   type Stage,
 } from './petState';
 import {
+  computeActivityExp,
   HEARTBEAT_MS,
   SAMPLE_INTERVAL_MS,
   type ActivityExpSnapshot,
   DAILY_ACTIVITY_EXP_CAP,
-  DAILY_FALLBACK_EXP_CAP,
   FALLBACK_COOLDOWN_MS,
   grantActivityExp,
   grantFallbackExp,
@@ -125,6 +125,7 @@ const activityCheckinButton = document.getElementById(
 ) as HTMLButtonElement;
 const activityResetButton = document.getElementById('activity-reset-btn') as HTMLButtonElement;
 const activityStatusElement = document.getElementById('activity-status') as HTMLElement;
+const activityMetricsElement = document.getElementById('activity-metrics') as HTMLElement;
 
 let state: PetState = loadState();
 let clickThroughEnabled = false;
@@ -136,10 +137,45 @@ let selectedPetId = playgroundPets[0]?.id ?? 'main';
 let activitySnapshot: ActivityExpSnapshot = loadActivitySnapshot(new Date());
 let sampleActiveSeconds = 0;
 let sampleInputEvents = 0;
+let sampleInputByType = createEmptyInputCounter();
+let dailyActiveSeconds = 0;
+let dailyInputByType = createEmptyInputCounter();
+let showDetailedMetrics = false;
 
 const overlayBridge = window.overlayBridge;
-const activitySignalsAvailable =
-  typeof document.hasFocus === 'function' && typeof document.visibilityState === 'string';
+
+type CountedInputEvent = 'keydown' | 'mousedown' | 'mousemove' | 'wheel' | 'touchstart';
+type InputCounter = Record<CountedInputEvent, number>;
+
+function createEmptyInputCounter(): InputCounter {
+  return {
+    keydown: 0,
+    mousedown: 0,
+    mousemove: 0,
+    wheel: 0,
+    touchstart: 0,
+  };
+}
+
+function sumInputCounter(counter: InputCounter): number {
+  return counter.keydown + counter.mousedown + counter.mousemove + counter.wheel + counter.touchstart;
+}
+
+function getCooldownRemainingMs(lastFallbackAt: string | null): number {
+  if (!lastFallbackAt) {
+    return 0;
+  }
+
+  const elapsed = Date.now() - Date.parse(lastFallbackAt);
+  return Math.max(0, FALLBACK_COOLDOWN_MS - elapsed);
+}
+
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  const remainSeconds = total % 60;
+  return `${minutes}m ${String(remainSeconds).padStart(2, '0')}s`;
+}
 
 function loadPlaygroundPets(): PlaygroundPet[] {
   try {
@@ -286,17 +322,37 @@ function applyOverlayState(overlayState: OverlayState): void {
 }
 
 function updateActivityUI(): void {
+  const previousDayKey = activitySnapshot.dayKey;
   activitySnapshot = rolloverSnapshot(activitySnapshot, new Date());
-  activityOptToggleButton.textContent = activitySnapshot.enabled ? '활동 EXP: ON' : '활동 EXP: OFF';
-  const fallbackCooldownReady =
-    !activitySnapshot.lastFallbackAt ||
-    Date.now() - Date.parse(activitySnapshot.lastFallbackAt) >= FALLBACK_COOLDOWN_MS;
-  activityCheckinButton.disabled = !fallbackCooldownReady;
+  if (previousDayKey !== activitySnapshot.dayKey) {
+    dailyActiveSeconds = 0;
+    dailyInputByType = createEmptyInputCounter();
+  }
 
-  const capabilityText = activitySignalsAvailable ? '수집 가능' : '수집 불가';
+  activityOptToggleButton.textContent = activitySnapshot.enabled ? '활동 EXP: ON' : '활동 EXP: OFF';
+  const cooldownRemainingMs = getCooldownRemainingMs(activitySnapshot.lastFallbackAt);
+  activityCheckinButton.disabled = cooldownRemainingMs > 0;
+  activityCheckinButton.textContent =
+    cooldownRemainingMs > 0
+      ? `EXP 획득 (${Math.ceil(cooldownRemainingMs / 1_000)}s)`
+      : 'EXP 획득';
+
+  const samplePreviewExp = computeActivityExp(sampleActiveSeconds, sampleInputEvents);
+  const sampleInputTotal = sumInputCounter(sampleInputByType);
+  const dailyInputTotal = sumInputCounter(dailyInputByType);
   activityStatusElement.textContent =
-    `측정:${capabilityText} · 오늘 활동 EXP ${activitySnapshot.dailyActivityExp}/${DAILY_ACTIVITY_EXP_CAP} · ` +
-    `체크인 ${activitySnapshot.dailyFallbackExp}/${DAILY_FALLBACK_EXP_CAP}`;
+    `오늘 활동 EXP ${activitySnapshot.dailyActivityExp}/${DAILY_ACTIVITY_EXP_CAP} · ` +
+    `수동 획득 EXP ${activitySnapshot.dailyFallbackExp} · 샘플 예상 +${samplePreviewExp}`;
+
+  if (showDetailedMetrics) {
+    activityMetricsElement.textContent =
+      `샘플 ${formatDuration(sampleActiveSeconds)} · 입력 ${sampleInputTotal}회 ` +
+      `(key ${sampleInputByType.keydown}, down ${sampleInputByType.mousedown}, move ${sampleInputByType.mousemove}, wheel ${sampleInputByType.wheel}, touch ${sampleInputByType.touchstart}) · ` +
+      `오늘 누적 ${formatDuration(dailyActiveSeconds)} / 입력 ${dailyInputTotal}회`;
+  } else {
+    activityMetricsElement.textContent =
+      `EXP를 클릭하면 집계를 표시합니다. 현재 샘플: ${formatDuration(sampleActiveSeconds)}, 입력 ${sampleInputTotal}회`;
+  }
 }
 
 function getStageExpProgress(exp: number, stage: Stage): { current: number; next: number; ratio: number } {
@@ -381,23 +437,23 @@ function removeBuddy(): void {
 }
 
 function isActivityTimeCountable(): boolean {
-  if (!activitySnapshot.enabled) {
-    return false;
-  }
-  if (!activitySignalsAvailable) {
-    return false;
-  }
-  if (clickThroughEnabled) {
-    return false;
-  }
-  return document.visibilityState === 'visible' && document.hasFocus();
+  return activitySnapshot.enabled;
 }
 
 function handleActivitySample(now: Date): void {
   const sampledActiveSeconds = sampleActiveSeconds;
   const sampledInputEvents = sampleInputEvents;
+  const sampledInputByType = { ...sampleInputByType };
   sampleActiveSeconds = 0;
   sampleInputEvents = 0;
+  sampleInputByType = createEmptyInputCounter();
+
+  dailyActiveSeconds += sampledActiveSeconds;
+  dailyInputByType.keydown += sampledInputByType.keydown;
+  dailyInputByType.mousedown += sampledInputByType.mousedown;
+  dailyInputByType.mousemove += sampledInputByType.mousemove;
+  dailyInputByType.wheel += sampledInputByType.wheel;
+  dailyInputByType.touchstart += sampledInputByType.touchstart;
 
   const result = grantActivityExp(activitySnapshot, sampledActiveSeconds, sampledInputEvents, now);
   activitySnapshot = result.snapshot;
@@ -413,11 +469,12 @@ function handleActivitySample(now: Date): void {
 }
 
 function bindActivitySignalEvents(): void {
-  const countedEvents: Array<keyof WindowEventMap> = ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchstart'];
+  const countedEvents: CountedInputEvent[] = ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchstart'];
   for (const eventName of countedEvents) {
     window.addEventListener(eventName, () => {
       if (activitySnapshot.enabled) {
         sampleInputEvents += 1;
+        sampleInputByType[eventName] += 1;
       }
     });
   }
@@ -451,6 +508,7 @@ activityOptToggleButton.addEventListener('click', () => {
   if (!activitySnapshot.enabled) {
     sampleActiveSeconds = 0;
     sampleInputEvents = 0;
+    sampleInputByType = createEmptyInputCounter();
   }
   persistActivitySnapshot(activitySnapshot);
   overlayHintElement.textContent = activitySnapshot.enabled
@@ -467,15 +525,13 @@ activityCheckinButton.addEventListener('click', () => {
 
   if (result.gainedExp > 0) {
     state = applyExpDelta(state, result.gainedExp);
-    overlayHintElement.textContent = `수동 체크인 EXP +${result.gainedExp}`;
+    overlayHintElement.textContent = `EXP 획득 +${result.gainedExp}`;
     render(state);
     return;
   }
 
-  if (result.reason === 'fallback-cap') {
-    overlayHintElement.textContent = '오늘 수동 체크인 한도에 도달했습니다.';
-  } else if (result.reason === 'fallback-cooldown') {
-    overlayHintElement.textContent = '체크인은 1시간 간격으로 사용할 수 있습니다.';
+  if (result.reason === 'fallback-cooldown') {
+    overlayHintElement.textContent = 'EXP 획득은 5분 간격으로 사용할 수 있습니다.';
   }
   updateActivityUI();
 });
@@ -532,9 +588,10 @@ if (overlayBridge) {
   clickThroughStatusElement.textContent = '브리지 없음';
 }
 
-if (!activitySignalsAvailable) {
-  overlayHintElement.textContent = '활동량 자동 수집이 불가하여 수동 체크인을 권장합니다.';
-}
+expTextElement.addEventListener('click', () => {
+  showDetailedMetrics = !showDetailedMetrics;
+  updateActivityUI();
+});
 
 bindActivitySignalEvents();
 render(state);

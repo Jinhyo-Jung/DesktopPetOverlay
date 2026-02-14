@@ -21,9 +21,9 @@ const DEFAULT_SNAPSHOT: ActivityExpSnapshot = {
 export const SAMPLE_INTERVAL_MS = 5 * 60_000;
 export const HEARTBEAT_MS = 1_000;
 export const DAILY_ACTIVITY_EXP_CAP = 36;
-export const DAILY_FALLBACK_EXP_CAP = 12;
-export const FALLBACK_EXP_GRANT = 4;
-export const FALLBACK_COOLDOWN_MS = 60 * 60_000;
+export const DAILY_FALLBACK_EXP_CAP = 999;
+export const FALLBACK_EXP_GRANT = 2;
+export const FALLBACK_COOLDOWN_MS = 5 * 60_000;
 
 const ACTIVE_MINUTE_WEIGHT = 0.4;
 const INPUT_EVENT_DIVISOR = 140;
@@ -165,11 +165,6 @@ export function grantFallbackExp(
   now: Date,
 ): { snapshot: ActivityExpSnapshot; gainedExp: number; reason: string } {
   const rolled = rolloverSnapshot(snapshot, now);
-  const remainingCap = Math.max(0, DAILY_FALLBACK_EXP_CAP - rolled.dailyFallbackExp);
-  if (remainingCap <= 0) {
-    return { snapshot: rolled, gainedExp: 0, reason: 'fallback-cap' };
-  }
-
   if (rolled.lastFallbackAt) {
     const elapsed = now.getTime() - Date.parse(rolled.lastFallbackAt);
     if (elapsed < FALLBACK_COOLDOWN_MS) {
@@ -177,7 +172,7 @@ export function grantFallbackExp(
     }
   }
 
-  const gainedExp = Math.min(FALLBACK_EXP_GRANT, remainingCap);
+  const gainedExp = FALLBACK_EXP_GRANT;
   const next: ActivityExpSnapshot = {
     ...rolled,
     dailyFallbackExp: rolled.dailyFallbackExp + gainedExp,

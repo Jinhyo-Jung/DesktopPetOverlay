@@ -1,5 +1,13 @@
 # CHANGE_LOG
 
+## 2026-02-14T22:50:31+09:00
+- 활동 EXP 집계 조건을 포커스/가시성 의존 방식에서 `활동 EXP ON` 기준으로 변경해 앱이 백그라운드에 있어도 시간 기반 자동 EXP가 누적되도록 조정했다.
+- `src/activityExp.ts`에서 수동 보상을 `EXP 획득` 버튼 기준으로 재정의해 1회 2 EXP, 5분 쿨다운으로 변경하고(기존 1시간 간격 체크인 대체), 관련 상수/쿨다운 로직을 갱신했다.
+- `index.html`, `src/renderer.ts`를 수정해 `수동 체크인` 버튼명을 `EXP 획득`으로 변경하고, EXP 수치 클릭 시 입력 이벤트별 집계(`keydown`, `mousedown`, `mousemove`, `wheel`, `touchstart`)와 샘플/일일 누적 시간을 확인할 수 있는 상세 표시를 추가했다.
+- `docs/policies/PC 활동 EXP 정책.md`, `docs/guides/DesktopPetOverlay 사용 가이드.md`를 최신 동작(백그라운드 집계, 5분 쿨다운 수동 획득, EXP 클릭 집계 보기) 기준으로 업데이트했다.
+- 아이콘 반영 안정성을 높이기 위해 `forge.config.ts`의 Windows 패키징 아이콘 설정을 `source/exe_icon3`(base) + `setupIcon`(`.ico`) 조합으로 조정하고, `src/main.ts` 창 아이콘 경로를 `.ico`로 통일했다.
+- 검증으로 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`, 실행 스모크 테스트를 수행했다.
+
 ## 2026-02-14T22:31:27+09:00
 - `docs/guides/DesktopPetOverlay 사용 가이드.md`를 추가해 결론 우선 구조로 실행/조작/활동 EXP/문제해결(버튼 미노출 포함) 사용법을 정리했다.
 - 버튼이 상태 문구(`상태 양호`) 때문에 숨겨지지 않음을 명시하고, UI가 작게 보일 때 하단 액션 버튼이 가려지는 문제를 줄이기 위해 `src/index.css`에 카드 스크롤(`overflow-y: auto`)과 높이 보정(`height: 100%`, `min-height: 0`)을 적용했다.
