@@ -15,8 +15,16 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({
+      options: {
+        bin: 'DesktopPetOverlay',
+      },
+    }),
+    new MakerDeb({
+      options: {
+        bin: 'DesktopPetOverlay',
+      },
+    }),
   ],
   plugins: [
     new VitePlugin({

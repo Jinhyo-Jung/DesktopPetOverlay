@@ -1,5 +1,11 @@
 # CHANGE_LOG
 
+## 2026-02-14T20:13:23+09:00
+- `package_windows.sh` 재검증 과정에서 Linux 배포 단계 실행 파일명 불일치 이슈를 수정하기 위해 `forge.config.ts`의 `MakerRpm`/`MakerDeb` `bin` 값을 `DesktopPetOverlay`로 설정했다.
+- WSL 환경에서 `bash skills/release-packaging-windows/scripts/package_windows.sh`를 다시 실행해 `npm run make` 성공을 확인했다.
+- 신규 산출물 `out/make/deb/x64/desktop-pet-overlay_1.0.0_amd64.deb`, `out/make/rpm/x64/desktop-pet-overlay-1.0.0-1.x86_64.rpm`의 경로/해시를 검증했다.
+- 최신 결과를 반영하도록 `docs/릴리즈 준비 결과.md`를 업데이트했다.
+
 ## 2026-02-14T19:52:48+09:00
 - `release-packaging-windows` 시나리오를 수행해 `npm run lint`와 Windows 타깃 패키징(`npm run package -- --platform=win32 --arch=x64`)을 실행했다.
 - 산출물 `out/DesktopPetOverlay-win32-x64/DesktopPetOverlay.exe`와 `resources/app.asar`의 경로/크기/SHA-256을 검증했다.
