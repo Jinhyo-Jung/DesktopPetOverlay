@@ -10,6 +10,7 @@ interface OverlayBridge {
   getState: () => Promise<OverlayState>;
   setClickThrough: (enabled: boolean) => Promise<boolean>;
   toggleClickThrough: () => Promise<boolean>;
+  moveWindowBy: (deltaX: number, deltaY: number) => Promise<void>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
 }
 
@@ -19,6 +20,8 @@ const overlayBridge: OverlayBridge = {
     ipcRenderer.invoke('overlay:set-click-through', enabled) as Promise<boolean>,
   toggleClickThrough: () =>
     ipcRenderer.invoke('overlay:toggle-click-through') as Promise<boolean>,
+  moveWindowBy: (deltaX: number, deltaY: number) =>
+    ipcRenderer.invoke('overlay:move-window-by', deltaX, deltaY) as Promise<void>,
   onClickThroughChanged: (callback: (state: OverlayState) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: OverlayState) => {
       callback(payload);

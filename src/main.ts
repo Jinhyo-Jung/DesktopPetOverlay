@@ -148,6 +148,26 @@ const clampWindowPosition = (): void => {
   }
 };
 
+const clampBoundsToWorkArea = (
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): { x: number; y: number } => {
+  const centerPoint = {
+    x: Math.round(x + width / 2),
+    y: Math.round(y + height / 2),
+  };
+  const display = screen.getDisplayNearestPoint(centerPoint);
+  const { x: workX, y: workY, width: workWidth, height: workHeight } = display.workArea;
+  const maxX = Math.max(workX, workX + workWidth - width);
+  const maxY = Math.max(workY, workY + workHeight - height);
+  return {
+    x: Math.min(Math.max(x, workX), maxX),
+    y: Math.min(Math.max(y, workY), maxY),
+  };
+};
+
 const getDefaultWindowPosition = (): { x: number; y: number } => {
   const display = screen.getPrimaryDisplay();
   const { x, y, width, height } = display.workArea;
@@ -221,6 +241,30 @@ const registerIpcHandlers = (): void => {
   ipcMain.handle('overlay:toggle-click-through', () =>
     applyClickThrough(!overlayPreferences.clickThroughEnabled),
   );
+
+  ipcMain.handle('overlay:move-window-by', (_event, rawDeltaX: unknown, rawDeltaY: unknown) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    const deltaX = Number.isFinite(rawDeltaX) ? Math.round(Number(rawDeltaX)) : 0;
+    const deltaY = Number.isFinite(rawDeltaY) ? Math.round(Number(rawDeltaY)) : 0;
+    if (deltaX === 0 && deltaY === 0) {
+      return;
+    }
+
+    const currentBounds = mainWindow.getBounds();
+    const next = clampBoundsToWorkArea(
+      currentBounds.x + deltaX,
+      currentBounds.y + deltaY,
+      currentBounds.width,
+      currentBounds.height,
+    );
+    mainWindow.setPosition(next.x, next.y);
+    overlayPreferences.x = next.x;
+    overlayPreferences.y = next.y;
+    writeOverlayPreferences();
+  });
 };
 
 app.on('ready', () => {

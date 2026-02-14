@@ -36,6 +36,7 @@ interface OverlayBridge {
   getState: () => Promise<OverlayState>;
   setClickThrough: (enabled: boolean) => Promise<boolean>;
   toggleClickThrough: () => Promise<boolean>;
+  moveWindowBy: (deltaX: number, deltaY: number) => Promise<void>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
 }
 
@@ -291,6 +292,9 @@ function renderPlayground(): void {
       const startY = event.clientY;
       const originX = pet.x;
       const originY = pet.y;
+      let previousX = startX;
+      let previousY = startY;
+      const useWindowDrag = pet.kind === 'main' && !uiPanelVisible && Boolean(overlayBridge);
       let moved = false;
       node.classList.add('dragging');
 
@@ -300,6 +304,18 @@ function renderPlayground(): void {
         if (Math.abs(deltaX) >= DRAG_THRESHOLD || Math.abs(deltaY) >= DRAG_THRESHOLD) {
           moved = true;
         }
+
+        if (useWindowDrag) {
+          const stepX = moveEvent.clientX - previousX;
+          const stepY = moveEvent.clientY - previousY;
+          previousX = moveEvent.clientX;
+          previousY = moveEvent.clientY;
+          if (stepX !== 0 || stepY !== 0) {
+            void overlayBridge?.moveWindowBy(stepX, stepY);
+          }
+          return;
+        }
+
         const nextX = originX + deltaX;
         const nextY = originY + deltaY;
         const index = playgroundPets.findIndex((item) => item.id === pet.id);
@@ -324,7 +340,9 @@ function renderPlayground(): void {
             overlayHintElement.textContent = '캐릭터 선택 완료';
           }
         } else {
-          overlayHintElement.textContent = '드래그 위치 저장 완료';
+          overlayHintElement.textContent = useWindowDrag
+            ? '창 위치 이동 완료'
+            : '드래그 위치 저장 완료';
         }
         persistPlaygroundPets();
         renderPlayground();
@@ -396,6 +414,8 @@ function updateActivityUI(): void {
 function updateHelpPanel(): void {
   helpPanelElement.textContent =
     `- 메인 캐릭터 클릭: 설정 UI를 열고/닫습니다.\n` +
+    `- 메인 캐릭터 드래그(컴팩트 화면): 창 자체가 이동합니다.\n` +
+    `- ESC: 열린 설정 UI를 닫습니다.\n` +
     `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
     `  (이미 100이라 변화가 없으면 EXP 없음)\n` +
     `- 활동 EXP(자동): 5분 샘플마다 시간/입력 집계로 자동 획득됩니다.\n` +
@@ -638,6 +658,15 @@ expTextElement.addEventListener('click', () => {
 
 helpButton.addEventListener('click', () => {
   helpPanelElement.classList.toggle('hidden');
+});
+
+window.addEventListener('keydown', (event: KeyboardEvent) => {
+  if (event.key !== 'Escape' || !uiPanelVisible) {
+    return;
+  }
+  event.preventDefault();
+  setUiPanelVisible(false);
+  overlayHintElement.textContent = 'ESC로 메인 UI를 숨겼습니다.';
 });
 
 updateHelpPanel();
