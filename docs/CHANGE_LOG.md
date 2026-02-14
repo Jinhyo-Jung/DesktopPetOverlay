@@ -1,5 +1,12 @@
 # CHANGE_LOG
 
+## 2026-02-14T19:38:18+09:00
+- 오버레이 고급 기능 1차로 클릭-통과 토글, 단축키 복구 경로(`Ctrl+Shift+O`), 창 위치/토글 상태 영속화를 구현했다.
+- `src/main.ts`에 오버레이 IPC(`overlay:get-state`, `overlay:set-click-through`, `overlay:toggle-click-through`)와 글로벌 단축키 처리, 위치 저장 로직을 추가했다.
+- `src/preload.ts`에 `overlayBridge`를 노출해 렌더러에서 클릭-통과 상태 조회/변경/구독이 가능하도록 연결했다.
+- `index.html`, `src/index.css`, `src/renderer.ts`를 갱신해 클릭-통과 상태 UI와 멀티 캐릭터 추가/삭제/드래그 영역을 추가하고 드래그/클릭 동작을 분리했다.
+- `check_overlay_flags.sh` 검증은 통과했으며, `npm run lint`는 WSL 환경에 `npm`이 없어 실행하지 못했다.
+
 ## 2026-02-14T19:28:19+09:00
 - `Feed/Clean/Play` 3개 액션을 포함한 상태 관리/저장/오프라인 진행 흐름을 1차 구현했다.
 - `src/petState.ts`를 추가해 스탯 감소, 액션 회복, 경고 생성, `schemaVersion` 기반 저장/마이그레이션(`v2`)을 통합했다.

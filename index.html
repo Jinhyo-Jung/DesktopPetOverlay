@@ -13,6 +13,21 @@
         <p id="stage-text" class="stage-text">Stage: Egg</p>
         <p id="warning-text" class="warning-text">상태 양호</p>
 
+        <section class="overlay-control-panel" aria-label="Overlay controls">
+          <div class="overlay-row">
+            <button id="click-through-toggle-btn" type="button">Click-through: OFF</button>
+            <span id="click-through-status" class="overlay-status">입력 캡처 중</span>
+          </div>
+          <div class="overlay-row">
+            <button id="add-character-btn" type="button">+ 캐릭터</button>
+            <button id="remove-character-btn" type="button">- 캐릭터</button>
+            <span id="character-count" class="overlay-status">캐릭터 1</span>
+          </div>
+          <p id="overlay-hint" class="overlay-hint">캐릭터를 드래그해 위치를 바꾸세요.</p>
+        </section>
+
+        <section id="pet-playground" class="pet-playground" aria-label="Pet playground"></section>
+
         <section class="stats-panel" aria-label="Pet stats">
           <div class="stat-item">
             <div class="stat-label-row">

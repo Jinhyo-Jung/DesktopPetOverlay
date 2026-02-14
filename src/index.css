@@ -31,7 +31,7 @@ body {
 .pet-card {
   width: 100%;
   max-width: 340px;
-  min-height: 390px;
+  min-height: 520px;
   border-radius: 18px;
   border: 1px solid #ead9aa;
   background: linear-gradient(180deg, #fff8d9, #ffe4a8);
@@ -66,6 +66,70 @@ h1 {
   text-align: center;
   color: #95413f;
   min-height: 18px;
+}
+
+.overlay-control-panel {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.overlay-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.overlay-row:first-child {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+}
+
+.overlay-status {
+  font-size: 11px;
+  color: #474747;
+  text-align: right;
+}
+
+.overlay-hint {
+  margin: 0;
+  font-size: 11px;
+  color: #6a6a6a;
+}
+
+.pet-playground {
+  height: 128px;
+  border: 1px dashed rgba(55, 55, 55, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.35);
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+  touch-action: none;
+}
+
+.playground-pet {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  cursor: grab;
+  -webkit-app-region: no-drag;
+}
+
+.playground-pet.selected {
+  border-color: #3568b0;
+  box-shadow: 0 0 0 2px rgba(53, 104, 176, 0.25);
+}
+
+.playground-pet.dragging {
+  cursor: grabbing;
 }
 
 .stats-panel {
