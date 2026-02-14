@@ -1,5 +1,13 @@
 # CHANGE_LOG
 
+## 2026-02-14T22:17:53+09:00
+- 클릭 통과 복구 단축키 충돌 가능성을 낮추기 위해 기본 단축키를 `Ctrl+Shift+O`에서 `Ctrl+Alt+Shift+O`로 변경했다.
+- 저장된 오버레이 창 좌표가 화면 밖으로 벗어난 경우를 방지하도록 `src/main.ts`에 작업영역 기준 위치 보정(clamp) 로직을 추가했다.
+- `src/renderer.ts`의 초기 단축키 안내 라벨도 새 조합(`Ctrl+Alt+Shift+O`)으로 일치시켰다.
+- 릴리스 검증 중 ESLint가 `build-mingw` 생성물(`compiler_depend.ts`)까지 스캔하던 문제를 해소하기 위해 `.eslintignore`를 추가해 `build-mingw/`, `out/`을 제외했다.
+- 기존 `out/DesktopPetOverlay-win32-x64/resources/app.asar` 파일 잠금(`EBUSY`)으로 재패키징이 반복 실패하여, 우회 빌드 산출물을 기반으로 실행 가능한 새 폴더 `out/DesktopPetOverlay-fixed-win32-x64`를 생성했다.
+- 새 실행 파일 `out/DesktopPetOverlay-fixed-win32-x64/DesktopPetOverlay.exe`의 기동 스모크 테스트(실행 후 강제 종료)로 기본 실행 가능 상태를 확인했다.
+
 ## 2026-02-14T22:00:19+09:00
 - 패키징 exe 환경에서 `Ctrl+Shift+O` 복구 실패 시 UI 잠금이 발생하던 구조를 수정해, 단축키 등록 실패 시 클릭 통과 ON 전환 자체를 차단하도록 변경했다.
 - `src/main.ts`에 단축키 등록 상태(`shortcutRegistered`)를 추가하고 `globalShortcut.register` 성공 여부를 추적하도록 보강했으며, 등록 실패 상태를 IPC(`overlay:get-state`, `overlay:click-through-changed`)로 렌더러에 전달하도록 확장했다.

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -24,8 +24,12 @@ const DEFAULT_PREFERENCES: OverlayPreferences = {
   clickThroughEnabled: false,
 };
 
-const CLICK_THROUGH_TOGGLE_SHORTCUT = 'CommandOrControl+Shift+O';
-const CLICK_THROUGH_SHORTCUT_LABEL = 'Ctrl+Shift+O';
+const CLICK_THROUGH_TOGGLE_SHORTCUT = 'CommandOrControl+Alt+Shift+O';
+const CLICK_THROUGH_SHORTCUT_LABEL = 'Ctrl+Alt+Shift+O';
+const WINDOW_WIDTH = 380;
+const WINDOW_HEIGHT = 560;
+const WINDOW_MIN_WIDTH = 360;
+const WINDOW_MIN_HEIGHT = 500;
 
 let mainWindow: BrowserWindow | null = null;
 let overlayPreferences: OverlayPreferences = { ...DEFAULT_PREFERENCES };
@@ -122,12 +126,33 @@ const persistWindowPosition = (): void => {
   writeOverlayPreferences();
 };
 
+const clampWindowPosition = (): void => {
+  if (!Number.isFinite(overlayPreferences.x) || !Number.isFinite(overlayPreferences.y)) {
+    return;
+  }
+
+  const x = overlayPreferences.x as number;
+  const y = overlayPreferences.y as number;
+  const display = screen.getDisplayNearestPoint({ x, y });
+  const { x: workX, y: workY, width: workWidth, height: workHeight } = display.workArea;
+  const maxX = Math.max(workX, workX + workWidth - WINDOW_WIDTH);
+  const maxY = Math.max(workY, workY + workHeight - WINDOW_HEIGHT);
+  const nextX = Math.min(Math.max(x, workX), maxX);
+  const nextY = Math.min(Math.max(y, workY), maxY);
+
+  if (nextX !== x || nextY !== y) {
+    overlayPreferences.x = nextX;
+    overlayPreferences.y = nextY;
+    writeOverlayPreferences();
+  }
+};
+
 const createWindow = () => {
   mainWindow = new BrowserWindow({
-    width: 380,
-    height: 560,
-    minWidth: 360,
-    minHeight: 500,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
+    minWidth: WINDOW_MIN_WIDTH,
+    minHeight: WINDOW_MIN_HEIGHT,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -173,6 +198,7 @@ const registerIpcHandlers = (): void => {
 
 app.on('ready', () => {
   overlayPreferences = readOverlayPreferences();
+  clampWindowPosition();
   registerIpcHandlers();
   registerOverlayShortcut();
   createWindow();

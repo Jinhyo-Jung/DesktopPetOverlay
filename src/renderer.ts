@@ -128,7 +128,7 @@ const activityStatusElement = document.getElementById('activity-status') as HTML
 
 let state: PetState = loadState();
 let clickThroughEnabled = false;
-let clickThroughShortcut = 'Ctrl+Shift+O';
+let clickThroughShortcut = 'Ctrl+Alt+Shift+O';
 let clickThroughShortcutRegistered = true;
 let playgroundPets: PlaygroundPet[] = loadPlaygroundPets();
 let selectedPetId = playgroundPets[0]?.id ?? 'main';

@@ -7,9 +7,14 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
+const packagerOutDir = process.env.FORGE_PACKAGER_OUT_DIR;
+const packagerAppName = process.env.FORGE_PACKAGER_APP_NAME;
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    ...(packagerOutDir ? { out: packagerOutDir } : {}),
+    ...(packagerAppName ? { name: packagerAppName } : {}),
   },
   rebuildConfig: {},
   makers: [
