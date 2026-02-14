@@ -1,5 +1,10 @@
 # CHANGE_LOG
 
+## 2026-02-14T21:07:49+09:00
+- `docs/코드 기반 breathing 아이디어.md` 기준으로 Win32 + Direct2D + WIC 호흡 모션 미리보기 구현 코드를 신규 추가해 `source/01_cat.png`를 비변형 상태로 렌더링하면서 Y축 정수 오프셋(±1~2px) 기반 사인파 애니메이션이 가능하도록 구성했다.
+- 루트 `CMakeLists.txt`와 `src/Main.cpp`, `src/Renderer.h`, `src/Renderer.cpp`, `src/BreathingMotion.h`를 생성하고 PNG 32bppPBGRA 로드, `DrawBitmap` `NEAREST_NEIGHBOR`, `lround` 기반 오프셋 계산, ComPtr 기반 COM 자원 관리를 반영했다.
+- WSL 환경에서 `cmake`/C++ 컴파일러가 설치되어 있지 않아 실제 빌드 실행 검증은 이번 작업에서 수행하지 못했다.
+
 ## 2026-02-14T20:13:23+09:00
 - `package_windows.sh` 재검증 과정에서 Linux 배포 단계 실행 파일명 불일치 이슈를 수정하기 위해 `forge.config.ts`의 `MakerRpm`/`MakerDeb` `bin` 값을 `DesktopPetOverlay`로 설정했다.
 - WSL 환경에서 `bash skills/release-packaging-windows/scripts/package_windows.sh`를 다시 실행해 `npm run make` 성공을 확인했다.
