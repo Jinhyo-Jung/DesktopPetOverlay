@@ -23,3 +23,10 @@ if(MINGW)
         -static-libstdc++
     )
 endif()
+
+add_custom_command(TARGET OverlayBreathingPreview POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:OverlayBreathingPreview>/source"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/source/01_cat.png"
+        "$<TARGET_FILE_DIR:OverlayBreathingPreview>/source/01_cat.png"
+)

@@ -1,5 +1,14 @@
 # CHANGE_LOG
 
+## 2026-02-14T21:27:19+09:00
+- 빌드 산출물 폴더에서 실행 시 이미지 경로 문제를 방지하기 위해 `CMakeLists.txt`에 POST_BUILD 복사 단계를 추가해 `build-mingw/source/01_cat.png`가 자동 생성되도록 조정했다.
+- 이 변경으로 `OverlayBreathingPreview.exe`를 더블클릭 실행해도 `./source/01_cat.png` 경로가 유효하도록 보장했다.
+
+## 2026-02-14T21:26:09+09:00
+- `OverlayBreathingPreview.exe`를 `build-mingw` 폴더에서 직접 실행할 때 상대경로(`./source/01_cat.png`) 해석 실패로 즉시 종료되는 문제를 수정했다.
+- `src/Main.cpp`에 PNG 경로 자동 탐색 로직(`./source`, `../source`, 실행 파일 기준 경로 후보)을 추가해 실행 위치와 무관하게 `source/01_cat.png`를 찾도록 보강했다.
+- 초기화 실패 시 원인을 확인할 수 있도록 단계별 `HRESULT` 오류 메시지(`MessageBoxW`)를 표시하도록 개선했다.
+
 ## 2026-02-14T21:23:36+09:00
 - Windows 실행 시 `libgcc_s_seh-1.dll` 누락 오류를 해결하기 위해 `CMakeLists.txt`에 MinGW 전용 정적 링크 옵션(`-static`, `-static-libgcc`, `-static-libstdc++`)을 추가했다.
 - 재빌드 후 실행 파일의 DLL 의존성을 재검증해 MinGW 런타임 DLL(`libgcc_s_seh-1.dll`, `libstdc++-6.dll`) 의존이 제거되도록 조정했다.
