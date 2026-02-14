@@ -1,0 +1,67 @@
+:root {
+  color-scheme: light;
+  font-family: 'Segoe UI', 'Noto Sans KR', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: transparent;
+  overflow: hidden;
+  -webkit-app-region: drag;
+}
+
+.pet-shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.pet-card {
+  width: 260px;
+  min-height: 250px;
+  border-radius: 20px;
+  border: 1px solid #e9d9a0;
+  background: linear-gradient(180deg, #fff8d9, #ffe4a8);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  padding: 16px;
+  text-align: center;
+}
+
+.pet-face {
+  font-size: 64px;
+  line-height: 1;
+}
+
+h1 {
+  margin: 8px 0 4px;
+  font-size: 18px;
+}
+
+p {
+  margin: 0;
+  font-size: 13px;
+}
+
+button {
+  margin-top: 12px;
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px;
+  font-weight: 600;
+  color: #203050;
+  background: #fff;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
