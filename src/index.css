@@ -137,6 +137,24 @@ h1 {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.help-button {
+  justify-self: start;
+  padding-inline: 12px;
+}
+
+.help-panel {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #3f3f3f;
+  white-space: pre-line;
+}
+
+.help-panel.hidden {
+  display: none;
 }
 
 .playground-pet {

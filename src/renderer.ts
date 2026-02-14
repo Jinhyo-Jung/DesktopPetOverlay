@@ -4,6 +4,7 @@ import {
   TICK_INTERVAL_MS,
   applyAction,
   applyExpDelta,
+  isActionEffective,
   loadState,
   persistSave,
   runTick,
@@ -126,6 +127,8 @@ const activityCheckinButton = document.getElementById(
 const activityResetButton = document.getElementById('activity-reset-btn') as HTMLButtonElement;
 const activityStatusElement = document.getElementById('activity-status') as HTMLElement;
 const activityMetricsElement = document.getElementById('activity-metrics') as HTMLElement;
+const helpButton = document.getElementById('help-btn') as HTMLButtonElement;
+const helpPanelElement = document.getElementById('help-panel') as HTMLElement;
 
 let state: PetState = loadState();
 let clickThroughEnabled = false;
@@ -175,6 +178,12 @@ function formatDuration(seconds: number): string {
   const minutes = Math.floor(total / 60);
   const remainSeconds = total % 60;
   return `${minutes}m ${String(remainSeconds).padStart(2, '0')}s`;
+}
+
+function updateActionButtons(nextState: PetState): void {
+  feedButton.disabled = !isActionEffective(nextState, 'feed');
+  cleanButton.disabled = !isActionEffective(nextState, 'clean');
+  playButton.disabled = !isActionEffective(nextState, 'play');
 }
 
 function loadPlaygroundPets(): PlaygroundPet[] {
@@ -341,8 +350,8 @@ function updateActivityUI(): void {
   const sampleInputTotal = sumInputCounter(sampleInputByType);
   const dailyInputTotal = sumInputCounter(dailyInputByType);
   activityStatusElement.textContent =
-    `오늘 활동 EXP ${activitySnapshot.dailyActivityExp}/${DAILY_ACTIVITY_EXP_CAP} · ` +
-    `수동 획득 EXP ${activitySnapshot.dailyFallbackExp} · 샘플 예상 +${samplePreviewExp}`;
+    `활동 EXP(자동) ${activitySnapshot.dailyActivityExp}/${DAILY_ACTIVITY_EXP_CAP} · ` +
+    `EXP 획득(수동) ${activitySnapshot.dailyFallbackExp} · 샘플 예상 +${samplePreviewExp}`;
 
   if (showDetailedMetrics) {
     activityMetricsElement.textContent =
@@ -353,6 +362,16 @@ function updateActivityUI(): void {
     activityMetricsElement.textContent =
       `EXP를 클릭하면 집계를 표시합니다. 현재 샘플: ${formatDuration(sampleActiveSeconds)}, 입력 ${sampleInputTotal}회`;
   }
+}
+
+function updateHelpPanel(): void {
+  helpPanelElement.textContent =
+    `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
+    `  (이미 100이라 변화가 없으면 EXP 없음)\n` +
+    `- 활동 EXP(자동): 5분 샘플마다 시간/입력 집계로 자동 획득됩니다.\n` +
+    `- EXP 획득(수동): 5분 쿨다운마다 +2 EXP를 받습니다.\n` +
+    `- 활동 EXP 기록 초기화: 활동 시스템으로 받은 누적 EXP 기록을 초기화하고 캐릭터 EXP에서 차감합니다.\n` +
+    `- EXP 숫자(예: 10 / 30) 클릭: 입력 이벤트별 집계와 누적 시간을 표시합니다.`;
 }
 
 function getStageExpProgress(exp: number, stage: Stage): { current: number; next: number; ratio: number } {
@@ -385,12 +404,17 @@ function render(nextState: PetState): void {
     statFillElements[key].style.width = `${value}%`;
   }
 
+  updateActionButtons(state);
   renderPlayground();
   updateClickThroughUI();
   updateActivityUI();
 }
 
 function handleAction(action: 'feed' | 'clean' | 'play'): void {
+  if (!isActionEffective(state, action)) {
+    overlayHintElement.textContent = '현재 상태에서는 해당 액션으로 얻을 수 있는 보상이 없습니다.';
+    return;
+  }
   render(applyAction(state, action));
 }
 
@@ -593,5 +617,10 @@ expTextElement.addEventListener('click', () => {
   updateActivityUI();
 });
 
+helpButton.addEventListener('click', () => {
+  helpPanelElement.classList.toggle('hidden');
+});
+
+updateHelpPanel();
 bindActivitySignalEvents();
 render(state);

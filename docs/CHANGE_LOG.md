@@ -1,5 +1,13 @@
 # CHANGE_LOG
 
+## 2026-02-14T23:03:50+09:00
+- `src/petState.ts`에 액션 유효성 판정(`isActionEffective`)을 추가하고 `Feed/Clean/Play`로 실제 스탯 변화가 없을 때 EXP/횟수 증가가 발생하지 않도록 방어 로직을 적용했다.
+- `src/renderer.ts`에서 액션 버튼을 유효성 기반으로 비활성화하고, 무효 액션 클릭 시 안내 문구를 표시해 무한 EXP 획득 경로를 차단했다.
+- `index.html`, `src/renderer.ts`, `src/index.css`를 갱신해 `Help` 버튼과 설명 패널을 추가하고, `EXP` 수치 클릭 집계 표시가 동작하도록 클릭 영역을 `no-drag`로 보정했다.
+- `활동 EXP` 상태 문구를 `활동 EXP(자동)` / `EXP 획득(수동)`으로 분리해 각 버튼과 EXP 의미를 명확히 표기했다.
+- 패키징 후 exe 아이콘 반영 문제 대응을 위해 `source/exe_icon3.ico`를 재생성하고 `rcedit`으로 `out/DesktopPetOverlay-win32-x64/DesktopPetOverlay.exe`에 아이콘을 재주입했다.
+- 검증으로 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`를 수행했고 최신 산출물 해시를 `docs/release/릴리즈 준비 결과.md`에 반영했다.
+
 ## 2026-02-14T22:50:31+09:00
 - 활동 EXP 집계 조건을 포커스/가시성 의존 방식에서 `활동 EXP ON` 기준으로 변경해 앱이 백그라운드에 있어도 시간 기반 자동 EXP가 누적되도록 조정했다.
 - `src/activityExp.ts`에서 수동 보상을 `EXP 획득` 버튼 기준으로 재정의해 1회 2 EXP, 5분 쿨다운으로 변경하고(기존 1시간 간격 체크인 대체), 관련 상수/쿨다운 로직을 갱신했다.

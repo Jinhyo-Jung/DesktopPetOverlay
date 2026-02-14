@@ -50,6 +50,26 @@ const ACTION_EFFECTS: Record<
   play: { hunger: 0, happiness: 22, cleanliness: 0, health: 0, exp: 4 },
 };
 
+function nextStatsForAction(stats: Stats, action: ActionType): Stats {
+  const effects = ACTION_EFFECTS[action];
+  return {
+    hunger: clamp(stats.hunger + effects.hunger),
+    happiness: clamp(stats.happiness + effects.happiness),
+    cleanliness: clamp(stats.cleanliness + effects.cleanliness),
+    health: clamp(stats.health + effects.health),
+  };
+}
+
+export function isActionEffective(current: PetState, action: ActionType): boolean {
+  const nextStats = nextStatsForAction(current.stats, action);
+  return (
+    nextStats.hunger > current.stats.hunger ||
+    nextStats.happiness > current.stats.happiness ||
+    nextStats.cleanliness > current.stats.cleanliness ||
+    nextStats.health > current.stats.health
+  );
+}
+
 const DEFAULT_STATS: Stats = {
   hunger: 100,
   happiness: 100,
@@ -314,15 +334,20 @@ export function applyAction(current: PetState, action: ActionType): PetState {
   const effects = ACTION_EFFECTS[action];
   const nowIso = new Date().toISOString();
   const base = toSave(current);
+  const nextStats = nextStatsForAction(base.stats, action);
+  const actionEffective =
+    nextStats.hunger > base.stats.hunger ||
+    nextStats.happiness > base.stats.happiness ||
+    nextStats.cleanliness > base.stats.cleanliness ||
+    nextStats.health > base.stats.health;
+
+  if (!actionEffective) {
+    return current;
+  }
 
   const next: PetSave = {
     ...base,
-    stats: {
-      hunger: clamp(base.stats.hunger + effects.hunger),
-      happiness: clamp(base.stats.happiness + effects.happiness),
-      cleanliness: clamp(base.stats.cleanliness + effects.cleanliness),
-      health: clamp(base.stats.health + effects.health),
-    },
+    stats: nextStats,
     exp: base.exp + effects.exp,
     lastSeenTimestamp: nowIso,
     actionCounts: {
