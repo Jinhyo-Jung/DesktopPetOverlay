@@ -6,19 +6,20 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import path from 'node:path';
 
-const packagerOutDir = process.env.FORGE_PACKAGER_OUT_DIR;
-const packagerAppName = process.env.FORGE_PACKAGER_APP_NAME;
+const windowsIconPath = path.resolve(__dirname, 'source', 'exe_icon3.ico');
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    ...(packagerOutDir ? { out: packagerOutDir } : {}),
-    ...(packagerAppName ? { name: packagerAppName } : {}),
+    icon: windowsIconPath,
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      setupIcon: windowsIconPath,
+    }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({
       options: {

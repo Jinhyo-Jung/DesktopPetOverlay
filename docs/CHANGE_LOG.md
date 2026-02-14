@@ -1,5 +1,13 @@
 # CHANGE_LOG
 
+## 2026-02-14T22:31:27+09:00
+- `docs/guides/DesktopPetOverlay 사용 가이드.md`를 추가해 결론 우선 구조로 실행/조작/활동 EXP/문제해결(버튼 미노출 포함) 사용법을 정리했다.
+- 버튼이 상태 문구(`상태 양호`) 때문에 숨겨지지 않음을 명시하고, UI가 작게 보일 때 하단 액션 버튼이 가려지는 문제를 줄이기 위해 `src/index.css`에 카드 스크롤(`overflow-y: auto`)과 높이 보정(`height: 100%`, `min-height: 0`)을 적용했다.
+- `src/main.ts`에서 기본 창 높이를 상향(`640`, 최소 `560`)해 하단 조작 버튼이 기본 창 크기에서 더 안정적으로 보이도록 조정했다.
+- 게임 아이콘 요청에 맞춰 `source/exe_icon3.png` 기반 `source/exe_icon3.ico`를 생성하고 `forge.config.ts`의 `packagerConfig.icon` 및 `MakerSquirrel.setupIcon`에 반영했다.
+- 요청한 정리 작업으로 `out/DesktopPetOverlay-fixed-win32-x64`, `out/DesktopPetOverlayNew -win32-x64`를 삭제하고 `out/DesktopPetOverlay-win32-x64` 경로에 Windows 패키지를 재생성했다.
+- 검증으로 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`, 실행 스모크 테스트를 수행했으며 결과를 `docs/release/릴리즈 준비 결과.md`에 반영했다.
+
 ## 2026-02-14T22:17:53+09:00
 - 클릭 통과 복구 단축키 충돌 가능성을 낮추기 위해 기본 단축키를 `Ctrl+Shift+O`에서 `Ctrl+Alt+Shift+O`로 변경했다.
 - 저장된 오버레이 창 좌표가 화면 밖으로 벗어난 경우를 방지하도록 `src/main.ts`에 작업영역 기준 위치 보정(clamp) 로직을 추가했다.

@@ -34,6 +34,7 @@
 - `docs/guides/개발 환경 구성.md`
 - `docs/guides/스킬 사용 가이드.md`
 - `docs/guides/OverlayBreathingPreview 실행 가이드.md`
+- `docs/guides/DesktopPetOverlay 사용 가이드.md`
 
 5. 정책
 - `docs/policies/PC 활동 EXP 정책.md`
