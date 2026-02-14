@@ -1,5 +1,9 @@
 # CHANGE_LOG
 
+## 2026-02-14T21:22:01+09:00
+- WSL에서 `cmake -S . -B build-mingw -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++` 빌드를 시도하던 중 MinGW 링크 단계에서 `WinMain` 엔트리포인트 누락 오류를 확인했다.
+- `src/Main.cpp`에 `WinMain` 래퍼를 추가해 기존 `wWinMain` 흐름을 재사용하도록 조정하고 MinGW 교차 컴파일 호환성을 보완했다.
+
 ## 2026-02-14T21:07:49+09:00
 - `docs/코드 기반 breathing 아이디어.md` 기준으로 Win32 + Direct2D + WIC 호흡 모션 미리보기 구현 코드를 신규 추가해 `source/01_cat.png`를 비변형 상태로 렌더링하면서 Y축 정수 오프셋(±1~2px) 기반 사인파 애니메이션이 가능하도록 구성했다.
 - 루트 `CMakeLists.txt`와 `src/Main.cpp`, `src/Renderer.h`, `src/Renderer.cpp`, `src/BreathingMotion.h`를 생성하고 PNG 32bppPBGRA 로드, `DrawBitmap` `NEAREST_NEIGHBOR`, `lround` 기반 오프셋 계산, ComPtr 기반 COM 자원 관리를 반영했다.

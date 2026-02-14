@@ -86,3 +86,8 @@ int WINAPI wWinMain(HINSTANCE Instance, HINSTANCE, PWSTR, int CmdShow)
         Sleep(10);
     }
 }
+
+int WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, int CmdShow)
+{
+    return wWinMain(Instance, PrevInstance, nullptr, CmdShow);
+}
