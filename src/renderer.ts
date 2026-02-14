@@ -44,7 +44,21 @@ interface OverlayBridge {
     anchorSize?: number;
     lockToTaskbar?: boolean;
   }) => Promise<void>;
+  getDisplays: () => Promise<DisplayInfo[]>;
+  moveToDisplay: (displayId: number) => Promise<boolean>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
+}
+
+interface DisplayInfo {
+  id: number;
+  name: string;
+  width: number;
+  height: number;
+  workAreaX: number;
+  workAreaY: number;
+  workAreaWidth: number;
+  workAreaHeight: number;
+  current: boolean;
 }
 
 declare global {
@@ -81,7 +95,7 @@ const UI_PANEL_POSITION_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-position-v1'
 const DRAG_THRESHOLD = 4;
 const PET_NODE_SIZE = 88;
 const MAIN_DEFAULT_X = 412;
-const MAIN_DEFAULT_Y = 12;
+const MAIN_DEFAULT_Y = 220;
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 
@@ -137,6 +151,10 @@ const playgroundElement = document.getElementById('pet-playground') as HTMLEleme
 const petCardElement = document.getElementById('pet-card') as HTMLElement;
 const petUiPanelElement = document.getElementById('pet-ui-panel') as HTMLElement;
 const panelDragHandleElement = document.getElementById('panel-drag-handle') as HTMLElement;
+const settingsButton = document.getElementById('settings-btn') as HTMLButtonElement;
+const displaySettingsPanel = document.getElementById('display-settings-panel') as HTMLElement;
+const displaySelect = document.getElementById('display-select') as HTMLSelectElement;
+const displayApplyButton = document.getElementById('display-apply-btn') as HTMLButtonElement;
 const activityOptToggleButton = document.getElementById(
   'activity-opt-toggle-btn',
 ) as HTMLButtonElement;
@@ -269,6 +287,7 @@ function setUiPanelVisible(visible: boolean): void {
     petCardElement.classList.add('expanded');
     requestAnimationFrame(() => applyUiPanelPosition());
   } else {
+    displaySettingsPanel.classList.add('hidden');
     petUiPanelElement.classList.add('hidden');
     petCardElement.classList.remove('expanded');
     petCardElement.classList.add('compact');
@@ -297,7 +316,7 @@ function loadPlaygroundPets(): PlaygroundPet[] {
     }
 
     const parsed = JSON.parse(raw) as PlaygroundPet[];
-    const sanitized = parsed
+    let sanitized = parsed
       .filter((pet) => pet && typeof pet.id === 'string' && pet.id.length > 0)
       .map((pet) => ({
         id: pet.id,
@@ -316,6 +335,10 @@ function loadPlaygroundPets(): PlaygroundPet[] {
         x: MAIN_DEFAULT_X,
         y: MAIN_DEFAULT_Y,
       });
+    } else if (mainPet.y < 80) {
+      sanitized = sanitized.map((pet) =>
+        pet.kind === 'main' ? { ...pet, y: MAIN_DEFAULT_Y } : pet,
+      );
     }
     return sanitized;
   } catch {
@@ -391,7 +414,7 @@ function renderPlayground(): void {
               deltaX: stepX,
               deltaY: stepY,
               anchorX: pet.x,
-              anchorY: Math.min(pet.y, 24),
+              anchorY: pet.y,
               anchorSize: PET_NODE_SIZE,
               lockToTaskbar: true,
             });
@@ -464,6 +487,25 @@ function applyOverlayState(overlayState: OverlayState): void {
   updateClickThroughUI();
 }
 
+async function refreshDisplayOptions(): Promise<void> {
+  if (!overlayBridge) {
+    return;
+  }
+
+  const displays = await overlayBridge.getDisplays();
+  displaySelect.replaceChildren();
+  for (const [index, display] of displays.entries()) {
+    const option = document.createElement('option');
+    option.value = String(display.id);
+    option.textContent =
+      `모니터 ${index + 1} · ${display.width}x${display.height}` +
+      (display.current ? ' (현재)' : '');
+    option.selected = display.current;
+    displaySelect.appendChild(option);
+  }
+  displayApplyButton.disabled = displays.length === 0;
+}
+
 function updateActivityUI(): void {
   const previousDayKey = activitySnapshot.dayKey;
   activitySnapshot = rolloverSnapshot(activitySnapshot, new Date());
@@ -498,7 +540,8 @@ function updateHelpPanel(): void {
   helpPanelElement.textContent =
     `- 메인 캐릭터 클릭: 설정 UI를 열고/닫습니다.\n` +
     `- 메인 캐릭터 드래그(컴팩트 화면): 캐릭터 기준으로 작업표시줄 위를 따라 이동합니다.\n` +
-    `- 스탯 패널 상단 '패널 이동' 드래그: 패널 위치를 창 안에서 자유롭게 이동합니다.\n` +
+    `- 스탯 패널 상단 '패널 이동' 드래그: 창 위치를 직접 이동합니다.\n` +
+    `- ⚙ 설정: 표시할 모니터를 선택해 캐릭터 위치를 전환합니다.\n` +
     `- ESC: 열린 설정 UI를 닫습니다.\n` +
     `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
     `  (이미 100이라 변화가 없으면 EXP 없음)\n` +
@@ -651,8 +694,9 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
   event.preventDefault();
   const startX = event.clientX;
   const startY = event.clientY;
-  const origin = uiPanelPosition ?? getDefaultUiPanelPosition();
   let moved = false;
+  let previousX = startX;
+  let previousY = startY;
 
   const onPointerMove = (moveEvent: PointerEvent): void => {
     const deltaX = moveEvent.clientX - startX;
@@ -660,8 +704,14 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
     if (Math.abs(deltaX) >= DRAG_THRESHOLD || Math.abs(deltaY) >= DRAG_THRESHOLD) {
       moved = true;
     }
-    uiPanelPosition = clampUiPanelPosition({ x: origin.x + deltaX, y: origin.y + deltaY });
-    applyUiPanelPosition();
+
+    const stepX = moveEvent.clientX - previousX;
+    const stepY = moveEvent.clientY - previousY;
+    previousX = moveEvent.clientX;
+    previousY = moveEvent.clientY;
+    if (stepX !== 0 || stepY !== 0) {
+      void overlayBridge?.moveWindowBy({ deltaX: stepX, deltaY: stepY, lockToTaskbar: false });
+    }
   };
 
   const onPointerUp = (): void => {
@@ -673,6 +723,36 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
 
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp, { once: true });
+});
+
+settingsButton.addEventListener('click', async () => {
+  displaySettingsPanel.classList.toggle('hidden');
+  if (!displaySettingsPanel.classList.contains('hidden')) {
+    try {
+      await refreshDisplayOptions();
+    } catch {
+      overlayHintElement.textContent = '모니터 정보를 불러오지 못했습니다.';
+    }
+  }
+});
+
+displayApplyButton.addEventListener('click', async () => {
+  if (!overlayBridge) {
+    return;
+  }
+
+  const displayId = Number(displaySelect.value);
+  if (!Number.isFinite(displayId)) {
+    return;
+  }
+
+  const moved = await overlayBridge.moveToDisplay(displayId);
+  if (moved) {
+    overlayHintElement.textContent = '선택한 모니터로 캐릭터를 이동했습니다.';
+    await refreshDisplayOptions();
+  } else {
+    overlayHintElement.textContent = '모니터 이동에 실패했습니다.';
+  }
 });
 
 clickThroughToggleButton.addEventListener('click', async () => {

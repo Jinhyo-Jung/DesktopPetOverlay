@@ -20,6 +20,7 @@
           <section class="overlay-control-panel" aria-label="Overlay controls">
             <div class="overlay-row overlay-row-toggle">
               <button id="click-through-toggle-btn" type="button">Click-through: OFF</button>
+              <button id="settings-btn" type="button" class="icon-button" title="설정">⚙</button>
               <span id="click-through-status" class="overlay-status">입력 캡처 중</span>
             </div>
             <div class="overlay-row overlay-row-character">
@@ -28,6 +29,11 @@
               <span id="character-count" class="overlay-status">캐릭터 1</span>
             </div>
             <p id="overlay-hint" class="overlay-hint">메인 캐릭터를 클릭하면 UI가 열리고 다시 클릭하면 닫힙니다.</p>
+            <section id="display-settings-panel" class="display-settings-panel hidden" aria-label="Display settings">
+              <label for="display-select">표시 모니터</label>
+              <select id="display-select"></select>
+              <button id="display-apply-btn" type="button">모니터 적용</button>
+            </section>
           </section>
 
           <section class="activity-panel" aria-label="Activity EXP">

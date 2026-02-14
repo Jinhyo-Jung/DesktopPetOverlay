@@ -29,6 +29,18 @@ interface WindowMovePayload {
   lockToTaskbar?: boolean;
 }
 
+interface DisplayInfo {
+  id: number;
+  name: string;
+  width: number;
+  height: number;
+  workAreaX: number;
+  workAreaY: number;
+  workAreaWidth: number;
+  workAreaHeight: number;
+  current: boolean;
+}
+
 const DEFAULT_PREFERENCES: OverlayPreferences = {
   clickThroughEnabled: false,
 };
@@ -88,6 +100,34 @@ const emitOverlayState = (): void => {
   }
 
   mainWindow.webContents.send('overlay:click-through-changed', getOverlayState());
+};
+
+const getCurrentDisplayId = (): number | null => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return null;
+  }
+
+  const bounds = mainWindow.getBounds();
+  const center = {
+    x: Math.round(bounds.x + bounds.width / 2),
+    y: Math.round(bounds.y + bounds.height / 2),
+  };
+  return screen.getDisplayNearestPoint(center).id;
+};
+
+const getDisplayInfos = (): DisplayInfo[] => {
+  const currentId = getCurrentDisplayId();
+  return screen.getAllDisplays().map((display) => ({
+    id: display.id,
+    name: display.label || `Display ${display.id}`,
+    width: display.bounds.width,
+    height: display.bounds.height,
+    workAreaX: display.workArea.x,
+    workAreaY: display.workArea.y,
+    workAreaWidth: display.workArea.width,
+    workAreaHeight: display.workArea.height,
+    current: currentId === display.id,
+  }));
 };
 
 const registerOverlayShortcut = (): boolean => {
@@ -280,7 +320,7 @@ const registerIpcHandlers = (): void => {
       ? Math.max(16, Math.min(256, Math.round(Number(payload.anchorSize))))
       : 44;
     const lockToTaskbar = payload.lockToTaskbar === true;
-    const normalizedAnchorY = Math.max(0, Math.min(anchorY, 32));
+    const safeAnchorY = Math.max(0, Math.min(anchorY, Math.max(0, currentBounds.height - anchorSize)));
 
     const displayPoint = hasAnchor
       ? {
@@ -314,7 +354,7 @@ const registerIpcHandlers = (): void => {
           y: Math.round(displayPoint.y),
         });
         const area = targetDisplay.workArea;
-        nextY = area.y + area.height - anchorSize - WINDOW_EDGE_MARGIN_Y - normalizedAnchorY;
+        nextY = area.y + area.height - anchorSize - WINDOW_EDGE_MARGIN_Y - safeAnchorY;
       } else {
         const minX = workX - anchorX;
         const maxX = workX + workWidth - anchorX - anchorSize;
@@ -333,6 +373,33 @@ const registerIpcHandlers = (): void => {
     overlayPreferences.x = nextX;
     overlayPreferences.y = nextY;
     writeOverlayPreferences();
+  });
+
+  ipcMain.handle('overlay:get-displays', () => getDisplayInfos());
+
+  ipcMain.handle('overlay:move-to-display', (_event, rawDisplayId: unknown) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return false;
+    }
+
+    const displayId = Number(rawDisplayId);
+    if (!Number.isFinite(displayId)) {
+      return false;
+    }
+
+    const target = screen.getAllDisplays().find((display) => display.id === displayId);
+    if (!target) {
+      return false;
+    }
+
+    const area = target.workArea;
+    const nextX = Math.round(area.x + area.width - WINDOW_WIDTH - WINDOW_EDGE_MARGIN_X);
+    const nextY = Math.round(area.y + area.height - WINDOW_HEIGHT - WINDOW_EDGE_MARGIN_Y);
+    mainWindow.setPosition(nextX, nextY);
+    overlayPreferences.x = nextX;
+    overlayPreferences.y = nextY;
+    writeOverlayPreferences();
+    return true;
   });
 };
 

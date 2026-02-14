@@ -118,7 +118,7 @@ h1 {
 }
 
 .overlay-row-toggle {
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 1fr);
 }
 
 .overlay-row-character {
@@ -135,6 +135,38 @@ h1 {
   margin: 0;
   font-size: 11px;
   color: #6a6a6a;
+}
+
+.icon-button {
+  width: 34px;
+  padding: 8px 0;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.display-settings-panel {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.display-settings-panel.hidden {
+  display: none;
+}
+
+.display-settings-panel label {
+  font-size: 11px;
+  color: #4a4a4a;
+}
+
+.display-settings-panel select {
+  border: 1px solid #d3c58a;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #fffdf4;
+  font-size: 12px;
 }
 
 .activity-panel {
