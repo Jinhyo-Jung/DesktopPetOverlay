@@ -9,10 +9,10 @@ if (started) {
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
-    width: 320,
-    height: 320,
-    minWidth: 240,
-    minHeight: 240,
+    width: 360,
+    height: 440,
+    minWidth: 320,
+    minHeight: 380,
     frame: false,
     transparent: true,
     alwaysOnTop: true,

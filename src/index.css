@@ -25,43 +25,124 @@ body {
   height: 100%;
   display: grid;
   place-items: center;
+  padding: 8px;
 }
 
 .pet-card {
-  width: 260px;
-  min-height: 250px;
-  border-radius: 20px;
-  border: 1px solid #e9d9a0;
+  width: 100%;
+  max-width: 340px;
+  min-height: 390px;
+  border-radius: 18px;
+  border: 1px solid #ead9aa;
   background: linear-gradient(180deg, #fff8d9, #ffe4a8);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
-  padding: 16px;
-  text-align: center;
+  padding: 14px;
+  text-align: left;
 }
 
 .pet-face {
-  font-size: 64px;
+  text-align: center;
+  font-size: 56px;
   line-height: 1;
+  margin-top: 2px;
 }
 
 h1 {
-  margin: 8px 0 4px;
-  font-size: 18px;
+  margin: 8px 0 0;
+  font-size: 17px;
+  text-align: center;
 }
 
-p {
-  margin: 0;
+.stage-text {
+  margin: 4px 0 0;
+  text-align: center;
   font-size: 13px;
+  color: #3f3f3f;
+}
+
+.warning-text {
+  margin: 6px 0 10px;
+  font-size: 12px;
+  text-align: center;
+  color: #95413f;
+  min-height: 18px;
+}
+
+.stats-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.stat-item {
+  display: grid;
+  gap: 4px;
+}
+
+.stat-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c2c2c;
+}
+
+.stat-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.stat-fill {
+  height: 100%;
+  width: 100%;
+  transition: width 160ms ease-out;
+}
+
+.stat-fill.hunger {
+  background: linear-gradient(90deg, #ffb35b, #ff7d55);
+}
+
+.stat-fill.happiness {
+  background: linear-gradient(90deg, #ffd96c, #ffb443);
+}
+
+.stat-fill.cleanliness {
+  background: linear-gradient(90deg, #97d8ff, #66b8ff);
+}
+
+.stat-fill.health {
+  background: linear-gradient(90deg, #74d783, #47bf6d);
+}
+
+.action-row {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 button {
-  margin-top: 12px;
-  width: 100%;
   border: 0;
   border-radius: 10px;
-  padding: 10px;
-  font-weight: 600;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 700;
   color: #203050;
   background: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
   cursor: pointer;
   -webkit-app-region: no-drag;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+.meta-text {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: #5f5f5f;
+  text-align: center;
 }

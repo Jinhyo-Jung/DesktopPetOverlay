@@ -1,5 +1,12 @@
 # CHANGE_LOG
 
+## 2026-02-14T19:28:19+09:00
+- `Feed/Clean/Play` 3개 액션을 포함한 상태 관리/저장/오프라인 진행 흐름을 1차 구현했다.
+- `src/petState.ts`를 추가해 스탯 감소, 액션 회복, 경고 생성, `schemaVersion` 기반 저장/마이그레이션(`v2`)을 통합했다.
+- `index.html`, `src/index.css`, `src/renderer.ts`를 갱신해 4개 스탯 게이지, 액션 버튼, 경고/메타 정보를 UI에 연결했다.
+- `source/save-fixtures/legacy-schema-v1.json`, `source/save-fixtures/latest-schema-v2.json` 샘플을 추가하고 `validate_save.py`로 필수 필드 검증을 통과했다.
+- `simulate_stats.py`로 2h/4h/8h/12h 감소 시뮬레이션을 실행해 밸런스 기본값을 확인했다.
+
 ## 2026-02-14T19:17:26+09:00
 - 참고용 문서 확장을 위해 `docs/캐릭터 디자인 전략.md` 내용을 대폭 보강했다.
 - 캐릭터 참고 에셋 4종(`source/01_cat*.png`)을 추가했다.

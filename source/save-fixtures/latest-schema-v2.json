@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "stats": {
+    "hunger": 90,
+    "happiness": 83,
+    "cleanliness": 92,
+    "health": 100
+  },
+  "stage": "Teen",
+  "exp": 110,
+  "lastSeenTimestamp": "2026-02-14T10:00:00.000Z",
+  "actionCounts": {
+    "feed": 3,
+    "clean": 2,
+    "play": 5
+  }
+}

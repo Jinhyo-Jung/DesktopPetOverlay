@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "stats": {
+    "hunger": 72,
+    "happiness": 68,
+    "cleanliness": 75,
+    "health": 88
+  },
+  "stage": "Baby",
+  "exp": 36,
+  "lastSeenTimestamp": "2026-02-14T08:30:00.000Z"
+}
