@@ -236,33 +236,32 @@ h1 {
   cursor: grabbing;
 }
 
-.playground-pet .pet-sprite {
+.playground-pet .pet-sprite-canvas {
   width: 100%;
   height: 100%;
-  object-fit: contain;
   image-rendering: auto;
   user-select: none;
   pointer-events: none;
   transform-origin: 50% 82%;
 }
 
-.playground-pet.state-idle .pet-sprite {
+.playground-pet.state-idle .pet-sprite-canvas {
   animation: pet-idle 1.8s ease-in-out infinite;
 }
 
-.playground-pet.state-walk .pet-sprite {
+.playground-pet.state-walk .pet-sprite-canvas {
   animation: pet-walk 0.45s ease-in-out infinite alternate;
 }
 
-.playground-pet.state-jump .pet-sprite {
+.playground-pet.state-jump .pet-sprite-canvas {
   animation: pet-jump 0.22s ease-out;
 }
 
-.playground-pet.state-fall .pet-sprite {
+.playground-pet.state-fall .pet-sprite-canvas {
   animation: pet-fall 0.22s ease-in;
 }
 
-.playground-pet.state-drag .pet-sprite {
+.playground-pet.state-drag .pet-sprite-canvas {
   animation: none;
   transform: rotate(-4deg) scale(1.03);
 }

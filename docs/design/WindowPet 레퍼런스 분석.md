@@ -53,7 +53,9 @@
 - `idle/walk/jump/fall/drag` 상태 전환 도입
 - 하단 지면 착지 시 `fall -> idle` 전환 도입
 - `png + json` 기본 파이프라인 도입 (`source/pet_sprites/main_cat.json`)
+- 상태별 다중 프레임 스프라이트 재생 도입(`idle/walk/jump/fall/drag`)
+- 알파 마스크 기반 hit-test를 스프라이트 기반 캐릭터 공통 경로로 일반화
 
-2. 남은 고도화
-- 다중 프레임 스프라이트시트 상태별 프레임 재생
-- 알파 마스크 기반 hit-test를 모든 캐릭터 타입으로 일반화
+2. 추가 고도화 후보
+- 캐릭터 타입별(`main/buddy/커스텀`) 별도 스프라이트 프로필 선택 UI
+- 프레임 간 보간(모션 블렌딩)과 착지 효과 사운드 연동
