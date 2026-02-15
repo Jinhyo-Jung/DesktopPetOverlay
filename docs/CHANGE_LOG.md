@@ -1,5 +1,12 @@
 # CHANGE_LOG
 
+## 2026-02-15T16:39:58+09:00
+- 메인 캐릭터 성장기 매핑을 추가했다. `code/src/renderer.ts`에서 `Stage`에 따라 `main-cat-baby`, `main-cat-teen`, `main-cat-adult` 스프라이트 프로필을 우선 선택하도록 변경했다.
+- `source/pet_sprites/main_cat.json`(adult 기준)을 기반으로 `baby/teen` 경로를 자동 치환해 파생 프로필을 로드하는 로직을 추가했다. 해당 폴더에 이미지가 준비되면 코드 수정 없이 자동 적용되고, 미준비 시 adult 프로필로 자동 fallback 된다.
+- 스프라이트 파이프라인 초기화는 첫 유효 설정 로드 후 종료하도록 정리해 중복 로드를 줄였다.
+- 점프 중 프레임 잠금 인덱스가 성장기 전환 시 유효 범위를 벗어날 수 있는 경우를 방어하도록 보강했다.
+- 검증으로 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`, `out/DesktopPetOverlay-win32-x64/DesktopPetOverlay.exe` 실행 스모크 테스트를 수행했다.
+
 ## 2026-02-15T16:36:08+09:00
 - `source/pet_emotions/main_cat/`를 성장기 기준으로 분리했다. `egg/`, `baby/`, `teen/`, `adult/` 폴더를 만들고 기존 메인 캐릭터 이모션 PNG를 `adult/`로 이동했다.
 - 런타임 경로가 깨지지 않도록 `source/pet_sprites/main_cat.json`의 `frameImages` 경로를 `source/pet_emotions/main_cat/adult/*`로 갱신했다.

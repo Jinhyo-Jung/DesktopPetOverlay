@@ -119,6 +119,11 @@ const PET_SPRITE_CONFIG_CANDIDATES = [
   '../../../source/pet_sprites/main_cat.json',
   '../../../../source/pet_sprites/main_cat.json',
 ];
+const MAIN_STAGE_PROFILE_KEY_MAP: Record<Exclude<Stage, 'Egg'>, string> = {
+  Baby: 'main-cat-baby',
+  Teen: 'main-cat-teen',
+  Adult: 'main-cat-adult',
+};
 const HAPPY_IMAGE_SWITCH_MS = 5_000;
 const IDLE_INACTIVE_THRESHOLD_MS = 45_000;
 const INACTIVE_IMAGE_SWITCH_MS = 7_000;
@@ -802,9 +807,79 @@ function registerSpriteProfile(profile: SpriteProfile): void {
   spriteProfileMap.set(profile.key, profile);
 }
 
+function mapAssetPathToGrowthStage(assetPath: string, stageFolder: 'baby' | 'teen'): string {
+  return assetPath.replace(/\/(egg|baby|teen|adult)\//, `/${stageFolder}/`);
+}
+
+function cloneConfigForGrowthStage(
+  baseConfig: PetSpriteConfig,
+  stageFolder: 'baby' | 'teen',
+): PetSpriteConfig | null {
+  if (!baseConfig.frameImages || baseConfig.frameImages.length === 0) {
+    return null;
+  }
+  return {
+    ...baseConfig,
+    name: stageFolder === 'baby' ? MAIN_STAGE_PROFILE_KEY_MAP.Baby : MAIN_STAGE_PROFILE_KEY_MAP.Teen,
+    frameImages: baseConfig.frameImages.map((item) => ({
+      ...item,
+      image: mapAssetPathToGrowthStage(item.image, stageFolder),
+    })),
+  };
+}
+
+async function loadSpriteProfileFromConfig(config: PetSpriteConfig): Promise<SpriteProfile | null> {
+  let atlas: { imageUrl: string; image: HTMLImageElement } | null = null;
+  const resolvedFrameImages: ResolvedFrameImage[] = [];
+
+  if (config.image) {
+    const resolvedAtlas = await resolveAssetUrl(config.image);
+    if (resolvedAtlas) {
+      atlas = {
+        imageUrl: resolvedAtlas,
+        image: await loadImage(resolvedAtlas),
+      };
+    }
+  }
+
+  if (config.frameImages && config.frameImages.length > 0) {
+    for (const frameImage of config.frameImages) {
+      const resolved = await resolveAssetUrl(frameImage.image);
+      if (!resolved) {
+        return null;
+      }
+      resolvedFrameImages.push({
+        id: frameImage.id,
+        url: resolved,
+        image: await loadImage(resolved),
+      });
+    }
+  }
+
+  if (!atlas && resolvedFrameImages.length === 0) {
+    return null;
+  }
+
+  return createSpriteProfile(config, atlas, resolvedFrameImages);
+}
+
+function resolveMainStageProfile(stage: Stage): SpriteProfile | null {
+  if (stage === 'Egg') {
+    return null;
+  }
+  const key = MAIN_STAGE_PROFILE_KEY_MAP[stage];
+  return spriteProfileMap.get(key) ?? null;
+}
+
 function getSpriteProfileForPet(pet: PlaygroundPet): SpriteProfile | null {
   if (pet.kind === 'main' && state.stage === 'Egg') {
     return null;
+  }
+  if (pet.kind === 'main') {
+    const stageProfile = resolveMainStageProfile(state.stage);
+    if (stageProfile) {
+      return stageProfile;
+    }
   }
   if (pet.spriteProfile) {
     const assigned = spriteProfileMap.get(pet.spriteProfile);
@@ -825,47 +900,39 @@ async function initializeSpritePipeline(): Promise<void> {
       continue;
     }
 
-    let atlas: { imageUrl: string; image: HTMLImageElement } | null = null;
-    const resolvedFrameImages: ResolvedFrameImage[] = [];
-
-    if (config.image) {
-      const resolvedAtlas = await resolveAssetUrl(config.image);
-      if (resolvedAtlas) {
-        atlas = {
-          imageUrl: resolvedAtlas,
-          image: await loadImage(resolvedAtlas),
-        };
-      }
-    }
-
-    if (config.frameImages && config.frameImages.length > 0) {
-      let allResolved = true;
-      for (const frameImage of config.frameImages) {
-        const resolved = await resolveAssetUrl(frameImage.image);
-        if (!resolved) {
-          allResolved = false;
-          break;
-        }
-        resolvedFrameImages.push({
-          id: frameImage.id,
-          url: resolved,
-          image: await loadImage(resolved),
-        });
-      }
-      if (!allResolved) {
-        continue;
-      }
-    }
-
-    if (!atlas && resolvedFrameImages.length === 0) {
+    const adultProfile = await loadSpriteProfileFromConfig(config);
+    if (!adultProfile) {
       continue;
     }
+    registerSpriteProfile({
+      ...adultProfile,
+      key: MAIN_STAGE_PROFILE_KEY_MAP.Adult,
+    });
+    registerSpriteProfile({
+      ...adultProfile,
+      key: config.name,
+    });
 
-    const profile = createSpriteProfile(config, atlas, resolvedFrameImages);
-    registerSpriteProfile(profile);
-    if (!defaultMainSpriteProfile) {
-      defaultMainSpriteProfile = profile;
+    const babyConfig = cloneConfigForGrowthStage(config, 'baby');
+    if (babyConfig) {
+      const babyProfile = await loadSpriteProfileFromConfig(babyConfig);
+      if (babyProfile) {
+        registerSpriteProfile(babyProfile);
+      }
     }
+
+    const teenConfig = cloneConfigForGrowthStage(config, 'teen');
+    if (teenConfig) {
+      const teenProfile = await loadSpriteProfileFromConfig(teenConfig);
+      if (teenProfile) {
+        registerSpriteProfile(teenProfile);
+      }
+    }
+
+    if (!defaultMainSpriteProfile) {
+      defaultMainSpriteProfile = adultProfile;
+    }
+    return;
   }
 }
 
@@ -1033,6 +1100,12 @@ function resolveMainEmotionFrameIndex(
   }
 
   if (isAirborne) {
+    if (
+      mainAirborneFrameLockIndex !== null &&
+      (mainAirborneFrameLockIndex < 0 || mainAirborneFrameLockIndex >= profile.frames.length)
+    ) {
+      mainAirborneFrameLockIndex = null;
+    }
     if (mainAirborneFrameLockIndex === null) {
       const previousFrame = petFrameIndexMap.get('main');
       if (
