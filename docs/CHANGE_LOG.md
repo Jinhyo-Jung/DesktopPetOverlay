@@ -1,5 +1,10 @@
 # CHANGE_LOG
 
+## 2026-02-15T14:51:27+09:00
+- 요청에 따라 `sprite:gen8` 생성 결과를 메인 캐릭터 설정에 실제 적용했다. `source/pet_sprites/main_cat.json`을 8프레임 상태맵(`idle/walk/jump/fall/drag`)으로 재생성하고 이름을 `main-cat`으로 유지해 기존 메인 캐릭터 키와 호환되도록 반영했다.
+- 적용 후 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`, `out/DesktopPetOverlay-win32-x64/DesktopPetOverlay.exe` 실행 스모크 테스트를 통과했다.
+- 참고용으로 생성했던 `source/pet_sprites/main_cat_8.generated.json`은 보존해 비교/튜닝 기준 파일로 사용 가능하다.
+
 ## 2026-02-15T14:38:43+09:00
 - 루트 설정 파일 정리를 위해 Forge/Vite/TypeScript/CMake 실제 설정 본문을 `code/`로 이동했다. `code/config/forge.config.ts`, `code/config/vite.*.config.ts`, `code/tsconfig.json`, `code/CMakeLists.txt`를 기준으로 관리하도록 재배치했다.
 - Electron Forge가 루트 `forge.config.ts` 자동 탐색을 사용하므로, 루트에는 `code/config/forge.config.ts`를 재export하는 얇은 래퍼만 남겼다.
