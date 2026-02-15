@@ -93,8 +93,10 @@ const BUDDY_EMOJI_POOL = ['🐶', '🐰', '🦊', '🐼', '🐸', '🐵'];
 const CHARACTER_STORAGE_KEY = 'desktop-pet-overlay-characters-v1';
 const UI_PANEL_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-visible-v1';
 const UI_PANEL_POSITION_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-position-v1';
+const CHARACTER_SIZE_LEVEL_STORAGE_KEY = 'desktop-pet-overlay-character-size-level-v1';
+const MAIN_MOTION_MODE_STORAGE_KEY = 'desktop-pet-overlay-main-motion-mode-v1';
 const DRAG_THRESHOLD = 4;
-const PET_NODE_SIZE = 88;
+const PET_BASE_NODE_SIZE = 88;
 const MAIN_DEFAULT_MARGIN_X = 48;
 const PET_GROUND_MARGIN_Y = 8;
 const PET_GRAVITY = 1_550;
@@ -104,6 +106,9 @@ const PET_INERTIA_DAMPING = 0.91;
 const PET_MIN_VELOCITY = 8;
 const PET_LANDING_MS = 150;
 const PET_MAX_AIR_MS = 2_400;
+const CHARACTER_SIZE_LEVEL_MIN = 1;
+const CHARACTER_SIZE_LEVEL_MAX = 10;
+const CHARACTER_SCALE_MAX = 6;
 const PET_SPRITE_CONFIG_CANDIDATES = [
   'source/pet_sprites/main_cat.json',
   './source/pet_sprites/main_cat.json',
@@ -112,6 +117,7 @@ const PET_SPRITE_CONFIG_CANDIDATES = [
 ];
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
+type MainMotionMode = 'random' | 'fixed';
 
 interface PlaygroundPet {
   id: string;
@@ -133,10 +139,13 @@ interface PetMotion {
   state: PetVisualState;
   vx: number;
   vy: number;
+  facing: 1 | -1;
   dragging: boolean;
   landingUntil: number;
   nextDecisionAt: number;
   stateStartedAt: number;
+  expressionFrameIndex: number | null;
+  nextExpressionAt: number;
 }
 
 interface PetSpriteConfig {
@@ -224,6 +233,9 @@ const settingsButton = document.getElementById('settings-btn') as HTMLButtonElem
 const displaySettingsPanel = document.getElementById('display-settings-panel') as HTMLElement;
 const displaySelect = document.getElementById('display-select') as HTMLSelectElement;
 const displayApplyButton = document.getElementById('display-apply-btn') as HTMLButtonElement;
+const characterSizeSlider = document.getElementById('character-size-slider') as HTMLInputElement;
+const characterSizeValue = document.getElementById('character-size-value') as HTMLElement;
+const mainMotionModeSelect = document.getElementById('main-motion-mode-select') as HTMLSelectElement;
 const activityOptToggleButton = document.getElementById(
   'activity-opt-toggle-btn',
 ) as HTMLButtonElement;
@@ -239,6 +251,8 @@ let state: PetState = loadState();
 let clickThroughEnabled = false;
 let clickThroughShortcut = 'Ctrl+Alt+Shift+O';
 let clickThroughShortcutRegistered = true;
+let characterSizeLevel = loadCharacterSizeLevel();
+let mainMotionMode = loadMainMotionMode();
 let playgroundPets: PlaygroundPet[] = loadPlaygroundPets();
 let selectedPetId = playgroundPets[0]?.id ?? 'main';
 
@@ -288,8 +302,55 @@ function getCooldownRemainingMs(lastFallbackAt: string | null): number {
   return Math.max(0, FALLBACK_COOLDOWN_MS - elapsed);
 }
 
+function clampCharacterSizeLevel(level: number): number {
+  return Math.min(CHARACTER_SIZE_LEVEL_MAX, Math.max(CHARACTER_SIZE_LEVEL_MIN, Math.round(level)));
+}
+
+function loadCharacterSizeLevel(): number {
+  const raw = window.localStorage.getItem(CHARACTER_SIZE_LEVEL_STORAGE_KEY);
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return CHARACTER_SIZE_LEVEL_MIN;
+  }
+  return clampCharacterSizeLevel(parsed);
+}
+
+function persistCharacterSizeLevel(): void {
+  window.localStorage.setItem(CHARACTER_SIZE_LEVEL_STORAGE_KEY, String(characterSizeLevel));
+}
+
+function getCharacterScale(level: number = characterSizeLevel): number {
+  const normalized =
+    (clampCharacterSizeLevel(level) - CHARACTER_SIZE_LEVEL_MIN) /
+    Math.max(1, CHARACTER_SIZE_LEVEL_MAX - CHARACTER_SIZE_LEVEL_MIN);
+  return 1 + normalized * (CHARACTER_SCALE_MAX - 1);
+}
+
+function getCurrentPetSize(): number {
+  return Math.max(24, Math.round(PET_BASE_NODE_SIZE * getCharacterScale()));
+}
+
+function loadMainMotionMode(): MainMotionMode {
+  const raw = window.localStorage.getItem(MAIN_MOTION_MODE_STORAGE_KEY);
+  return raw === 'fixed' ? 'fixed' : 'random';
+}
+
+function persistMainMotionMode(): void {
+  window.localStorage.setItem(MAIN_MOTION_MODE_STORAGE_KEY, mainMotionMode);
+}
+
+function isMainMotionRandom(): boolean {
+  return mainMotionMode === 'random';
+}
+
+function updateCharacterSettingsUI(): void {
+  characterSizeSlider.value = String(characterSizeLevel);
+  characterSizeValue.textContent = `${characterSizeLevel} (x${getCharacterScale().toFixed(2)})`;
+  mainMotionModeSelect.value = mainMotionMode;
+}
+
 function getGroundY(): number {
-  return Math.max(0, playgroundElement.clientHeight - PET_NODE_SIZE - PET_GROUND_MARGIN_Y);
+  return Math.max(0, playgroundElement.clientHeight - getCurrentPetSize() - PET_GROUND_MARGIN_Y);
 }
 
 function ensurePetMotion(petId: string): PetMotion {
@@ -302,10 +363,13 @@ function ensurePetMotion(petId: string): PetMotion {
     state: 'idle',
     vx: 0,
     vy: 0,
+    facing: 1,
     dragging: false,
     landingUntil: 0,
     nextDecisionAt: nowMs + 2_000,
     stateStartedAt: nowMs,
+    expressionFrameIndex: null,
+    nextExpressionAt: nowMs + 800 + Math.random() * 1_400,
   };
   petMotionMap.set(petId, created);
   return created;
@@ -729,13 +793,47 @@ function resolveAnimationFrameIndex(pet: PlaygroundPet, motion: PetMotion, nowMs
   if (!runtime || runtime.frames.length === 0) {
     return 0;
   }
-  const frameDuration = 1_000 / Math.max(1, runtime.fps);
+
+  if (
+    motion.state === 'idle' &&
+    motion.expressionFrameIndex !== null &&
+    runtime.frames.includes(motion.expressionFrameIndex)
+  ) {
+    return motion.expressionFrameIndex;
+  }
+
+  const effectiveFps =
+    motion.state === 'walk'
+      ? Math.min(16, Math.max(runtime.fps, runtime.fps + Math.abs(motion.vx) / 35))
+      : runtime.fps;
+  const frameDuration = 1_000 / Math.max(1, effectiveFps);
   const elapsed = Math.max(0, nowMs - motion.stateStartedAt);
   const frameStep = Math.floor(elapsed / frameDuration);
   const frameOffset = runtime.loop
     ? frameStep % runtime.frames.length
     : Math.min(runtime.frames.length - 1, frameStep);
   return runtime.frames[frameOffset] ?? 0;
+}
+
+function updateIdleExpressionFrame(pet: PlaygroundPet, motion: PetMotion, nowMs: number): void {
+  const profile = getSpriteProfileForPet(pet);
+  if (!profile) {
+    motion.expressionFrameIndex = null;
+    return;
+  }
+  const idleFrames = profile.states.idle.frames;
+  if (motion.state !== 'idle' || idleFrames.length <= 1) {
+    motion.expressionFrameIndex = null;
+    return;
+  }
+  if (motion.expressionFrameIndex !== null && nowMs < motion.nextExpressionAt) {
+    return;
+  }
+  const candidateFrames = idleFrames.filter((frameIndex) => frameIndex !== motion.expressionFrameIndex);
+  const framePool = candidateFrames.length > 0 ? candidateFrames : idleFrames;
+  const nextFrame = framePool[Math.floor(Math.random() * framePool.length)] ?? idleFrames[0];
+  motion.expressionFrameIndex = nextFrame;
+  motion.nextExpressionAt = nowMs + 900 + Math.random() * 2_300;
 }
 
 function drawSpriteFrame(node: HTMLButtonElement, pet: PlaygroundPet, motion: PetMotion, nowMs: number): void {
@@ -755,6 +853,7 @@ function drawSpriteFrame(node: HTMLButtonElement, pet: PlaygroundPet, motion: Pe
   if (!ctx) {
     return;
   }
+  ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(
     profile.image,
@@ -798,7 +897,9 @@ function isPetOpaqueAt(node: HTMLElement, clientX: number, clientY: number): boo
   if (localX < 0 || localY < 0 || localX >= rect.width || localY >= rect.height) {
     return false;
   }
-  const px = Math.max(0, Math.min(alphaData.width - 1, Math.floor((localX / rect.width) * alphaData.width)));
+  const motion = ensurePetMotion(pet.id);
+  const sampleX = motion.facing < 0 ? rect.width - localX : localX;
+  const px = Math.max(0, Math.min(alphaData.width - 1, Math.floor((sampleX / rect.width) * alphaData.width)));
   const py = Math.max(
     0,
     Math.min(alphaData.height - 1, Math.floor((localY / rect.height) * alphaData.height)),
@@ -810,14 +911,24 @@ function isPetOpaqueAt(node: HTMLElement, clientX: number, clientY: number): boo
 
 function applyPetNodeVisual(node: HTMLButtonElement, pet: PlaygroundPet, nowMs: number = performance.now()): void {
   const motion = ensurePetMotion(pet.id);
+  const petSize = getCurrentPetSize();
   node.classList.toggle('selected', pet.id === selectedPetId);
   node.classList.toggle('state-idle', motion.state === 'idle');
   node.classList.toggle('state-walk', motion.state === 'walk');
   node.classList.toggle('state-jump', motion.state === 'jump');
   node.classList.toggle('state-fall', motion.state === 'fall');
   node.classList.toggle('state-drag', motion.state === 'drag');
+  node.style.width = `${petSize}px`;
+  node.style.height = `${petSize}px`;
   node.style.left = `${pet.x}px`;
   node.style.top = `${pet.y}px`;
+  node.style.setProperty('--pet-facing', motion.facing < 0 ? '-1' : '1');
+
+  const canvas = node.querySelector('canvas.pet-sprite-canvas') as HTMLCanvasElement | null;
+  if (canvas && (canvas.width !== petSize || canvas.height !== petSize)) {
+    canvas.width = petSize;
+    canvas.height = petSize;
+  }
   drawSpriteFrame(node, pet, motion, nowMs);
 }
 
@@ -894,9 +1005,10 @@ function updateActionButtons(nextState: PetState): void {
 }
 
 function getDefaultMainPetPosition(): { x: number; y: number } {
+  const petSize = getCurrentPetSize();
   return {
-    x: Math.max(8, window.innerWidth - PET_NODE_SIZE - MAIN_DEFAULT_MARGIN_X),
-    y: Math.max(8, window.innerHeight - PET_NODE_SIZE - PET_GROUND_MARGIN_Y),
+    x: Math.max(8, window.innerWidth - petSize - MAIN_DEFAULT_MARGIN_X),
+    y: Math.max(8, window.innerHeight - petSize - PET_GROUND_MARGIN_Y),
   };
 }
 
@@ -966,8 +1078,9 @@ function persistPlaygroundPets(): void {
 }
 
 function clampPetPosition(pet: PlaygroundPet): PlaygroundPet {
-  const maxX = Math.max(0, playgroundElement.clientWidth - PET_NODE_SIZE);
-  const maxY = Math.max(0, playgroundElement.clientHeight - PET_NODE_SIZE);
+  const petSize = getCurrentPetSize();
+  const maxX = Math.max(0, playgroundElement.clientWidth - petSize);
+  const maxY = Math.max(0, playgroundElement.clientHeight - petSize);
   return {
     ...pet,
     x: Math.max(0, Math.min(maxX, pet.x)),
@@ -998,7 +1111,13 @@ function realignPetPositionsForViewport(nowMs: number): void {
 
     if (pet.kind === 'main') {
       motion.nextDecisionAt = Math.min(motion.nextDecisionAt, nowMs + 500);
+      if (!isMainMotionRandom()) {
+        transitionMotionState(motion, 'idle', nowMs);
+        motion.vx = 0;
+        motion.vy = 0;
+      }
     }
+    updateIdleExpressionFrame(nextPet, motion, nowMs);
     return nextPet;
   });
 }
@@ -1012,30 +1131,44 @@ function stepPetMotion(deltaSec: number, nowMs: number): void {
     }
 
     let nextPet = { ...pet };
-    const maxX = Math.max(0, playgroundElement.clientWidth - PET_NODE_SIZE);
+    const petSize = getCurrentPetSize();
+    const maxX = Math.max(0, playgroundElement.clientWidth - petSize);
 
     if (!isAirborneState(motion.state) && Math.abs(nextPet.y - groundY) > 0.5) {
       nextPet.y = groundY;
     }
 
     if (pet.kind === 'main') {
-      if (motion.state === 'idle' && nowMs >= motion.nextDecisionAt) {
-        transitionMotionState(motion, 'walk', nowMs);
-        motion.vx = Math.random() > 0.5 ? PET_WALK_SPEED : -PET_WALK_SPEED;
-        motion.nextDecisionAt = nowMs + 1_200 + Math.random() * 1_800;
-      } else if (motion.state === 'walk' && nowMs >= motion.nextDecisionAt) {
-        if (Math.random() < 0.35) {
-          transitionMotionState(motion, 'jump', nowMs);
-          motion.vx = motion.vx === 0 ? (Math.random() > 0.5 ? PET_WALK_SPEED : -PET_WALK_SPEED) : motion.vx;
-          motion.vy = PET_JUMP_VELOCITY;
-          motion.landingUntil = 0;
-          motion.nextDecisionAt = nowMs + 1_100 + Math.random() * 700;
-        } else {
-          transitionMotionState(motion, 'idle', nowMs);
-          motion.vx = 0;
-          motion.nextDecisionAt = nowMs + 900 + Math.random() * 1_100;
+      if (isMainMotionRandom()) {
+        if (motion.state === 'idle' && nowMs >= motion.nextDecisionAt) {
+          transitionMotionState(motion, 'walk', nowMs);
+          motion.vx = Math.random() > 0.5 ? PET_WALK_SPEED : -PET_WALK_SPEED;
+          motion.nextDecisionAt = nowMs + 1_200 + Math.random() * 1_800;
+        } else if (motion.state === 'walk' && nowMs >= motion.nextDecisionAt) {
+          if (Math.random() < 0.35) {
+            transitionMotionState(motion, 'jump', nowMs);
+            motion.vx = motion.vx === 0 ? (Math.random() > 0.5 ? PET_WALK_SPEED : -PET_WALK_SPEED) : motion.vx;
+            motion.vy = PET_JUMP_VELOCITY;
+            motion.landingUntil = 0;
+            motion.nextDecisionAt = nowMs + 1_100 + Math.random() * 700;
+          } else {
+            transitionMotionState(motion, 'idle', nowMs);
+            motion.vx = 0;
+            motion.nextDecisionAt = nowMs + 900 + Math.random() * 1_100;
+          }
         }
+      } else if (!motion.dragging && !isAirborneState(motion.state)) {
+        transitionMotionState(motion, 'idle', nowMs);
+        motion.vx = 0;
+        motion.vy = 0;
+        motion.landingUntil = 0;
       }
+    }
+
+    if (motion.vx < -PET_MIN_VELOCITY) {
+      motion.facing = -1;
+    } else if (motion.vx > PET_MIN_VELOCITY) {
+      motion.facing = 1;
     }
 
     if (motion.state === 'walk') {
@@ -1084,6 +1217,7 @@ function stepPetMotion(deltaSec: number, nowMs: number): void {
 
     if (motion.state === 'walk' && (nextPet.x <= 0 || nextPet.x >= maxX)) {
       motion.vx = motion.vx === 0 ? (nextPet.x <= 0 ? PET_WALK_SPEED : -PET_WALK_SPEED) : -motion.vx;
+      motion.facing = motion.vx < 0 ? -1 : 1;
       nextPet.x = Math.max(0, Math.min(maxX, nextPet.x));
     }
 
@@ -1093,6 +1227,14 @@ function stepPetMotion(deltaSec: number, nowMs: number): void {
       motion.landingUntil = 0;
     }
 
+    if (pet.kind === 'main' && !isMainMotionRandom()) {
+      transitionMotionState(motion, 'idle', nowMs);
+      motion.vx = 0;
+      motion.vy = 0;
+      nextPet.y = groundY;
+    }
+
+    updateIdleExpressionFrame(pet, motion, nowMs);
     return nextPet;
   });
 
@@ -1138,18 +1280,22 @@ function renderPlayground(): void {
   for (const pet of playgroundPets) {
     const motion = ensurePetMotion(pet.id);
     const spriteProfile = getSpriteProfileForPet(pet);
+    const petSize = getCurrentPetSize();
     const node = document.createElement('button');
     node.type = 'button';
     node.className = `playground-pet ${pet.kind}`;
     node.dataset.petId = pet.id;
     node.title = pet.kind === 'main' ? '메인 캐릭터' : '보조 캐릭터';
     if (spriteProfile) {
+      const shell = document.createElement('div');
+      shell.className = 'pet-sprite-shell';
       const canvas = document.createElement('canvas');
       canvas.className = 'pet-sprite-canvas';
-      canvas.width = PET_NODE_SIZE;
-      canvas.height = PET_NODE_SIZE;
+      canvas.width = petSize;
+      canvas.height = petSize;
       canvas.setAttribute('aria-hidden', 'true');
-      node.appendChild(canvas);
+      shell.appendChild(canvas);
+      node.appendChild(shell);
     } else {
       node.textContent = pet.emoji;
     }
@@ -1229,11 +1375,21 @@ function renderPlayground(): void {
             overlayHintElement.textContent = '캐릭터 선택 완료';
           }
         } else {
-          motion.vx = velocityX * 0.08;
-          motion.vy = velocityY * 0.08;
-          transitionMotionState(motion, motion.vy < 0 ? 'jump' : 'fall', performance.now());
-          motion.landingUntil = 0;
-          motion.nextDecisionAt = performance.now() + 1_200;
+          const nowMs = performance.now();
+          if (pet.kind === 'main' && !isMainMotionRandom()) {
+            transitionMotionState(motion, 'idle', nowMs);
+            motion.vx = 0;
+            motion.vy = 0;
+            motion.landingUntil = 0;
+            motion.nextDecisionAt = nowMs + 20_000;
+          } else {
+            motion.vx = velocityX * 0.08;
+            motion.vy = velocityY * 0.08;
+            motion.facing = motion.vx < 0 ? -1 : 1;
+            transitionMotionState(motion, motion.vy < 0 ? 'jump' : 'fall', nowMs);
+            motion.landingUntil = 0;
+            motion.nextDecisionAt = nowMs + 1_200;
+          }
           overlayHintElement.textContent = '드래그 위치 저장 완료';
         }
         persistPlaygroundPets();
@@ -1294,6 +1450,51 @@ async function refreshDisplayOptions(): Promise<void> {
   displayApplyButton.disabled = displays.length === 0;
 }
 
+function applyMainMotionMode(mode: MainMotionMode): void {
+  mainMotionMode = mode;
+  persistMainMotionMode();
+  const nowMs = performance.now();
+  const mainPet = playgroundPets.find((pet) => pet.kind === 'main');
+  if (!mainPet) {
+    updateCharacterSettingsUI();
+    return;
+  }
+
+  const motion = ensurePetMotion(mainPet.id);
+  if (mainMotionMode === 'fixed') {
+    transitionMotionState(motion, 'idle', nowMs);
+    motion.vx = 0;
+    motion.vy = 0;
+    motion.landingUntil = 0;
+    mainPet.y = getGroundY();
+    overlayHintElement.textContent = '메인 캐릭터를 현재 위치에 고정했습니다.';
+  } else {
+    motion.nextDecisionAt = Math.min(motion.nextDecisionAt, nowMs + 500);
+    overlayHintElement.textContent = '메인 캐릭터 랜덤 이동을 활성화했습니다.';
+  }
+
+  updateCharacterSettingsUI();
+  persistPlaygroundPets();
+  renderPlayground();
+}
+
+function syncMainMotionModeOnBoot(): void {
+  if (isMainMotionRandom()) {
+    return;
+  }
+  const mainPet = playgroundPets.find((pet) => pet.kind === 'main');
+  if (!mainPet) {
+    return;
+  }
+  const nowMs = performance.now();
+  const motion = ensurePetMotion(mainPet.id);
+  transitionMotionState(motion, 'idle', nowMs);
+  motion.vx = 0;
+  motion.vy = 0;
+  motion.landingUntil = 0;
+  mainPet.y = getGroundY();
+}
+
 function updateActivityUI(): void {
   const previousDayKey = activitySnapshot.dayKey;
   activitySnapshot = rolloverSnapshot(activitySnapshot, new Date());
@@ -1332,6 +1533,9 @@ function updateHelpPanel(): void {
     `- 상태 머신: idle / walk / jump / fall / drag 상태로 전환되며 자동 움직임이 적용됩니다.\n` +
     `- 착지 연출: 하단 지면(작업영역 하단) 도달 시 fall -> idle 전환으로 착지 효과를 냅니다.\n` +
     `- 스프라이트 재생: 상태별 프레임 시퀀스를 JSON으로 정의해 멀티 프레임으로 재생합니다.\n` +
+    `- 이동 모드: ⚙ 설정에서 랜덤 이동/현재 위치 고정을 전환할 수 있습니다.\n` +
+    `- 크기 조절: ⚙ 설정의 캐릭터 크기(1~10)에서 최대 x6.00까지 확대됩니다.\n` +
+    `- 생동감 모션: 이동 방향 반전, 걷기 속도 연동 FPS, 유휴 표정 랜덤 전환이 적용됩니다.\n` +
     `- 스탯 패널 상단 '패널 이동' 드래그: 모니터 해상도 범위 안에서 패널만 이동합니다.\n` +
     `- ⚙ 설정: 표시할 모니터를 선택해 캐릭터 위치를 전환합니다.\n` +
     `- ESC: 열린 설정 UI를 닫습니다.\n` +
@@ -1535,12 +1739,34 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
 settingsButton.addEventListener('click', async () => {
   displaySettingsPanel.classList.toggle('hidden');
   if (!displaySettingsPanel.classList.contains('hidden')) {
+    updateCharacterSettingsUI();
     try {
       await refreshDisplayOptions();
     } catch {
       overlayHintElement.textContent = '모니터 정보를 불러오지 못했습니다.';
     }
   }
+});
+
+characterSizeSlider.addEventListener('input', () => {
+  const nextLevel = clampCharacterSizeLevel(Number(characterSizeSlider.value));
+  if (nextLevel === characterSizeLevel) {
+    updateCharacterSettingsUI();
+    return;
+  }
+
+  characterSizeLevel = nextLevel;
+  persistCharacterSizeLevel();
+  realignPetPositionsForViewport(performance.now());
+  updateCharacterSettingsUI();
+  persistPlaygroundPets();
+  renderPlayground();
+  overlayHintElement.textContent = `캐릭터 크기를 ${characterSizeLevel} 단계로 변경했습니다.`;
+});
+
+mainMotionModeSelect.addEventListener('change', () => {
+  const mode = mainMotionModeSelect.value === 'fixed' ? 'fixed' : 'random';
+  applyMainMotionMode(mode);
 });
 
 displayApplyButton.addEventListener('click', async () => {
@@ -1707,6 +1933,8 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 });
 
 updateHelpPanel();
+updateCharacterSettingsUI();
+syncMainMotionModeOnBoot();
 setUiPanelVisible(uiPanelVisible);
 bindActivitySignalEvents();
 render(state);

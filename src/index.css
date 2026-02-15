@@ -172,6 +172,15 @@ h1 {
   font-size: 12px;
 }
 
+.display-settings-panel input[type="range"] {
+  width: 100%;
+}
+
+.settings-inline {
+  display: grid;
+  gap: 4px;
+}
+
 .activity-panel {
   margin-bottom: 10px;
   display: grid;
@@ -243,6 +252,15 @@ h1 {
   user-select: none;
   pointer-events: none;
   transform-origin: 50% 82%;
+}
+
+.playground-pet .pet-sprite-shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transform: scaleX(var(--pet-facing, 1));
 }
 
 .playground-pet.state-idle .pet-sprite-canvas {

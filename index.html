@@ -34,6 +34,16 @@
               <label for="display-select">표시 모니터</label>
               <select id="display-select"></select>
               <button id="display-apply-btn" type="button">모니터 적용</button>
+              <label for="character-size-slider">캐릭터 크기</label>
+              <div class="settings-inline">
+                <input id="character-size-slider" type="range" min="1" max="10" step="1" />
+                <span id="character-size-value" class="overlay-status">1 (x1.00)</span>
+              </div>
+              <label for="main-motion-mode-select">메인 캐릭터 이동</label>
+              <select id="main-motion-mode-select">
+                <option value="random">랜덤 이동</option>
+                <option value="fixed">현재 위치 고정</option>
+              </select>
             </section>
           </section>
 
