@@ -190,6 +190,7 @@ interface SpriteProfile {
   frameAlphaData: Array<ImageData | null>;
   states: Record<PetVisualState, SpriteStateRuntime>;
   hitAlphaThreshold: number;
+  groundInsetRatio: number;
 }
 
 const statKeys: StatKey[] = ['hunger', 'happiness', 'cleanliness', 'health'];
@@ -351,8 +352,17 @@ function updateCharacterSettingsUI(): void {
   mainMotionModeSelect.value = mainMotionMode;
 }
 
-function getGroundY(): number {
-  return Math.max(0, playgroundElement.clientHeight - getCurrentPetSize() - PET_GROUND_MARGIN_Y);
+function getPetGroundInsetPx(pet: PlaygroundPet, petSize: number = getCurrentPetSize()): number {
+  const profile = getSpriteProfileForPet(pet);
+  if (!profile) {
+    return 0;
+  }
+  return Math.round(petSize * profile.groundInsetRatio);
+}
+
+function getGroundYForPet(pet: PlaygroundPet, petSize: number = getCurrentPetSize()): number {
+  const insetPx = getPetGroundInsetPx(pet, petSize);
+  return Math.max(0, playgroundElement.clientHeight - petSize - PET_GROUND_MARGIN_Y + insetPx);
 }
 
 function ensurePetMotion(petId: string): PetMotion {
@@ -633,20 +643,60 @@ function resolveSpriteStates(config: PetSpriteConfig, frameCount: number): Recor
   return fallback;
 }
 
+function estimateGroundInsetRatio(
+  frameAlphaData: Array<ImageData | null>,
+  hitAlphaThreshold: number,
+): number {
+  const ratios: number[] = [];
+  for (const alphaData of frameAlphaData) {
+    if (!alphaData) {
+      continue;
+    }
+    let bottomOpaqueY = -1;
+    for (let y = alphaData.height - 1; y >= 0; y -= 1) {
+      let found = false;
+      for (let x = 0; x < alphaData.width; x += 1) {
+        const alphaIndex = (y * alphaData.width + x) * 4 + 3;
+        if ((alphaData.data[alphaIndex] ?? 0) >= hitAlphaThreshold) {
+          bottomOpaqueY = y;
+          found = true;
+          break;
+        }
+      }
+      if (found) {
+        break;
+      }
+    }
+    if (bottomOpaqueY >= 0) {
+      const insetPx = Math.max(0, alphaData.height - 1 - bottomOpaqueY);
+      ratios.push(insetPx / Math.max(1, alphaData.height));
+    }
+  }
+  if (ratios.length === 0) {
+    return 0;
+  }
+  ratios.sort((a, b) => a - b);
+  const median = ratios[Math.floor(ratios.length / 2)] ?? 0;
+  return Math.max(0, Math.min(0.35, median));
+}
+
 function createSpriteProfile(
   config: PetSpriteConfig,
   imageUrl: string,
   image: HTMLImageElement,
 ): SpriteProfile {
   const frames = resolveSpriteFrames(config, image);
+  const hitAlphaThreshold = config.hitAlphaThreshold ?? 12;
+  const frameAlphaData = frames.map((frame) => buildFrameAlphaData(image, frame));
   return {
     key: config.name,
     imageUrl,
     image,
     frames,
-    frameAlphaData: frames.map((frame) => buildFrameAlphaData(image, frame)),
+    frameAlphaData,
     states: resolveSpriteStates(config, frames.length),
-    hitAlphaThreshold: config.hitAlphaThreshold ?? 12,
+    hitAlphaThreshold,
+    groundInsetRatio: estimateGroundInsetRatio(frameAlphaData, hitAlphaThreshold),
   };
 }
 
@@ -1014,9 +1064,17 @@ function updateActionButtons(nextState: PetState): void {
 
 function getDefaultMainPetPosition(): { x: number; y: number } {
   const petSize = getCurrentPetSize();
+  const mainPet: PlaygroundPet = {
+    id: 'main',
+    kind: 'main',
+    emoji: STAGE_FACE_MAP[state.stage],
+    x: 0,
+    y: 0,
+    spriteProfile: 'main-cat',
+  };
   return {
     x: Math.max(8, window.innerWidth - petSize - MAIN_DEFAULT_MARGIN_X),
-    y: Math.max(8, window.innerHeight - petSize - PET_GROUND_MARGIN_Y),
+    y: getGroundYForPet(mainPet, petSize),
   };
 }
 
@@ -1088,7 +1146,7 @@ function persistPlaygroundPets(): void {
 function clampPetPosition(pet: PlaygroundPet): PlaygroundPet {
   const petSize = getCurrentPetSize();
   const maxX = Math.max(0, playgroundElement.clientWidth - petSize);
-  const maxY = Math.max(0, playgroundElement.clientHeight - petSize);
+  const maxY = Math.max(0, playgroundElement.clientHeight - petSize + getPetGroundInsetPx(pet, petSize));
   return {
     ...pet,
     x: Math.max(0, Math.min(maxX, pet.x)),
@@ -1097,10 +1155,10 @@ function clampPetPosition(pet: PlaygroundPet): PlaygroundPet {
 }
 
 function realignPetPositionsForViewport(nowMs: number): void {
-  const groundY = getGroundY();
   playgroundPets = playgroundPets.map((pet) => {
     const motion = ensurePetMotion(pet.id);
     const nextPet = clampPetPosition({ ...pet });
+    const groundY = getGroundYForPet(nextPet);
     if (motion.dragging) {
       return nextPet;
     }
@@ -1131,7 +1189,6 @@ function realignPetPositionsForViewport(nowMs: number): void {
 }
 
 function stepPetMotion(deltaSec: number, nowMs: number): void {
-  const groundY = getGroundY();
   playgroundPets = playgroundPets.map((pet) => {
     const motion = ensurePetMotion(pet.id);
     if (motion.dragging) {
@@ -1141,6 +1198,7 @@ function stepPetMotion(deltaSec: number, nowMs: number): void {
     let nextPet = { ...pet };
     const petSize = getCurrentPetSize();
     const maxX = Math.max(0, playgroundElement.clientWidth - petSize);
+    const groundY = getGroundYForPet(nextPet, petSize);
 
     if (!isAirborneState(motion.state) && Math.abs(nextPet.y - groundY) > 0.5) {
       nextPet.y = groundY;
@@ -1475,7 +1533,7 @@ function applyMainMotionMode(mode: MainMotionMode): void {
     motion.vx = 0;
     motion.vy = 0;
     motion.landingUntil = 0;
-    mainPet.y = getGroundY();
+    mainPet.y = getGroundYForPet(mainPet);
     overlayHintElement.textContent = '메인 캐릭터를 현재 위치에 고정했습니다.';
   } else {
     motion.nextDecisionAt = Math.min(motion.nextDecisionAt, nowMs + 500);
@@ -1501,12 +1559,14 @@ function applyCharacterSizeLevel(nextLevel: number): void {
 
   if (oldSize !== newSize) {
     playgroundPets = playgroundPets.map((pet) => {
+      const oldInset = getPetGroundInsetPx(pet, oldSize);
+      const newInset = getPetGroundInsetPx(pet, newSize);
       const anchorX = pet.x + oldSize / 2;
-      const anchorY = pet.y + oldSize;
+      const anchorY = pet.y + oldSize - oldInset;
       return clampPetPosition({
         ...pet,
         x: anchorX - newSize / 2,
-        y: anchorY - newSize,
+        y: anchorY - (newSize - newInset),
       });
     });
   }
@@ -1532,7 +1592,7 @@ function syncMainMotionModeOnBoot(): void {
   motion.vx = 0;
   motion.vy = 0;
   motion.landingUntil = 0;
-  mainPet.y = getGroundY();
+  mainPet.y = getGroundYForPet(mainPet);
 }
 
 function updateActivityUI(): void {
