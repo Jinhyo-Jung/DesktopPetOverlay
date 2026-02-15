@@ -46,3 +46,14 @@
 
 4. 에셋 파이프라인 정리
 - 우리 앱도 `png spritesheet + json 상태맵` 포맷을 표준으로 지정하면 확장 캐릭터 추가가 쉬워집니다.
+
+## DesktopPetOverlay 도입 현황 (2026-02-15)
+1. 도입 완료
+- 드래그 관성 이동(짧은 감쇠) 도입
+- `idle/walk/jump/fall/drag` 상태 전환 도입
+- 하단 지면 착지 시 `fall -> idle` 전환 도입
+- `png + json` 기본 파이프라인 도입 (`source/pet_sprites/main_cat.json`)
+
+2. 남은 고도화
+- 다중 프레임 스프라이트시트 상태별 프레임 재생
+- 알파 마스크 기반 hit-test를 모든 캐릭터 타입으로 일반화

@@ -97,6 +97,19 @@ const DRAG_THRESHOLD = 4;
 const PET_NODE_SIZE = 88;
 const MAIN_DEFAULT_MARGIN_X = 48;
 const MAIN_DEFAULT_MARGIN_Y = 32;
+const PET_GROUND_MARGIN_Y = 8;
+const PET_GRAVITY = 1_550;
+const PET_WALK_SPEED = 85;
+const PET_JUMP_VELOCITY = -420;
+const PET_INERTIA_DAMPING = 0.91;
+const PET_MIN_VELOCITY = 8;
+const PET_LANDING_MS = 150;
+const PET_SPRITE_CONFIG_CANDIDATES = [
+  'source/pet_sprites/main_cat.json',
+  './source/pet_sprites/main_cat.json',
+  '../source/pet_sprites/main_cat.json',
+  '../../source/pet_sprites/main_cat.json',
+];
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 
@@ -111,6 +124,24 @@ interface PlaygroundPet {
 interface UiPanelPosition {
   x: number;
   y: number;
+}
+
+type PetVisualState = 'idle' | 'walk' | 'jump' | 'fall' | 'drag';
+
+interface PetMotion {
+  state: PetVisualState;
+  vx: number;
+  vy: number;
+  dragging: boolean;
+  landingUntil: number;
+  nextDecisionAt: number;
+}
+
+interface PetSpriteConfig {
+  version: number;
+  name: string;
+  image: string;
+  hitAlphaThreshold?: number;
 }
 
 const statKeys: StatKey[] = ['hunger', 'happiness', 'cleanliness', 'health'];
@@ -185,6 +216,12 @@ let uiPanelVisible = loadUiPanelVisible();
 let uiPanelPosition: UiPanelPosition | null = loadUiPanelPosition();
 let pointerCaptureState: boolean | null = null;
 let dragLockCount = 0;
+const petMotionMap = new Map<string, PetMotion>();
+let liveLoopHandle = 0;
+let liveLoopLastTs = 0;
+let mainSpriteConfig: PetSpriteConfig | null = null;
+let mainSpriteUrl: string | null = null;
+let mainSpriteAlphaData: ImageData | null = null;
 
 const overlayBridge = window.overlayBridge;
 
@@ -212,6 +249,121 @@ function getCooldownRemainingMs(lastFallbackAt: string | null): number {
 
   const elapsed = Date.now() - Date.parse(lastFallbackAt);
   return Math.max(0, FALLBACK_COOLDOWN_MS - elapsed);
+}
+
+function getGroundY(): number {
+  return Math.max(0, playgroundElement.clientHeight - PET_NODE_SIZE - PET_GROUND_MARGIN_Y);
+}
+
+function ensurePetMotion(petId: string): PetMotion {
+  const existing = petMotionMap.get(petId);
+  if (existing) {
+    return existing;
+  }
+  const created: PetMotion = {
+    state: 'idle',
+    vx: 0,
+    vy: 0,
+    dragging: false,
+    landingUntil: 0,
+    nextDecisionAt: performance.now() + 2_000,
+  };
+  petMotionMap.set(petId, created);
+  return created;
+}
+
+function parseSpriteConfig(raw: unknown): PetSpriteConfig | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  const image = typeof record.image === 'string' ? record.image.trim() : '';
+  if (!image) {
+    return null;
+  }
+  return {
+    version: Number.isFinite(record.version) ? Number(record.version) : 1,
+    name: typeof record.name === 'string' ? record.name : 'main',
+    image,
+    hitAlphaThreshold: Number.isFinite(record.hitAlphaThreshold)
+      ? Number(record.hitAlphaThreshold)
+      : 12,
+  };
+}
+
+async function fetchSpriteConfig(pathname: string): Promise<PetSpriteConfig | null> {
+  try {
+    const response = await fetch(pathname, { cache: 'no-store' });
+    if (!response.ok) {
+      return null;
+    }
+    const json = (await response.json()) as unknown;
+    return parseSpriteConfig(json);
+  } catch {
+    return null;
+  }
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('image-load-failed'));
+    image.src = url;
+  });
+}
+
+async function resolveSpriteImageUrl(config: PetSpriteConfig): Promise<string | null> {
+  const candidates = [
+    config.image,
+    `./${config.image}`,
+    `../${config.image}`,
+    `../../${config.image}`,
+  ];
+  for (const candidate of candidates) {
+    try {
+      await loadImage(candidate);
+      return candidate;
+    } catch {
+      // try next
+    }
+  }
+  return null;
+}
+
+function buildAlphaData(image: HTMLImageElement): ImageData | null {
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    return null;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) {
+    return null;
+  }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0);
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+async function initializeSpritePipeline(): Promise<void> {
+  for (const candidate of PET_SPRITE_CONFIG_CANDIDATES) {
+    const config = await fetchSpriteConfig(candidate);
+    if (!config) {
+      continue;
+    }
+    const resolved = await resolveSpriteImageUrl(config);
+    if (!resolved) {
+      continue;
+    }
+    const image = await loadImage(resolved);
+    mainSpriteConfig = config;
+    mainSpriteUrl = resolved;
+    mainSpriteAlphaData = buildAlphaData(image);
+    return;
+  }
 }
 
 function loadUiPanelVisible(): boolean {
@@ -312,6 +464,56 @@ async function applyPointerCapture(enabled: boolean): Promise<void> {
   }
 }
 
+function isMainPetOpaqueAt(node: HTMLElement, clientX: number, clientY: number): boolean {
+  if (!mainSpriteAlphaData || !mainSpriteConfig) {
+    return true;
+  }
+  if (node.dataset.petId !== 'main') {
+    return true;
+  }
+
+  const rect = node.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return false;
+  }
+  const localX = clientX - rect.left;
+  const localY = clientY - rect.top;
+  if (localX < 0 || localY < 0 || localX >= rect.width || localY >= rect.height) {
+    return false;
+  }
+
+  const px = Math.max(
+    0,
+    Math.min(
+      mainSpriteAlphaData.width - 1,
+      Math.floor((localX / rect.width) * mainSpriteAlphaData.width),
+    ),
+  );
+  const py = Math.max(
+    0,
+    Math.min(
+      mainSpriteAlphaData.height - 1,
+      Math.floor((localY / rect.height) * mainSpriteAlphaData.height),
+    ),
+  );
+  const alphaIndex = (py * mainSpriteAlphaData.width + px) * 4 + 3;
+  const alpha = mainSpriteAlphaData.data[alphaIndex] ?? 0;
+  const threshold = mainSpriteConfig.hitAlphaThreshold ?? 12;
+  return alpha >= threshold;
+}
+
+function applyPetNodeVisual(node: HTMLButtonElement, pet: PlaygroundPet): void {
+  const motion = ensurePetMotion(pet.id);
+  node.classList.toggle('selected', pet.id === selectedPetId);
+  node.classList.toggle('state-idle', motion.state === 'idle');
+  node.classList.toggle('state-walk', motion.state === 'walk');
+  node.classList.toggle('state-jump', motion.state === 'jump');
+  node.classList.toggle('state-fall', motion.state === 'fall');
+  node.classList.toggle('state-drag', motion.state === 'drag');
+  node.style.left = `${pet.x}px`;
+  node.style.top = `${pet.y}px`;
+}
+
 function shouldCapturePointerAt(clientX: number, clientY: number): boolean {
   if (clickThroughEnabled) {
     return false;
@@ -319,6 +521,11 @@ function shouldCapturePointerAt(clientX: number, clientY: number): boolean {
 
   const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
   if (!target) {
+    return false;
+  }
+
+  const petNode = target.closest('.playground-pet') as HTMLElement | null;
+  if (petNode && !isMainPetOpaqueAt(petNode, clientX, clientY)) {
     return false;
   }
 
@@ -436,6 +643,114 @@ function clampPetPosition(pet: PlaygroundPet): PlaygroundPet {
   };
 }
 
+function stepPetMotion(deltaSec: number, nowMs: number): void {
+  const groundY = getGroundY();
+  let changed = false;
+  playgroundPets = playgroundPets.map((pet) => {
+    const motion = ensurePetMotion(pet.id);
+    if (motion.dragging) {
+      return pet;
+    }
+
+    let nextPet = { ...pet };
+
+    if (pet.kind === 'main') {
+      if (motion.state === 'idle' && nowMs >= motion.nextDecisionAt) {
+        motion.state = 'walk';
+        motion.vx = Math.random() > 0.5 ? PET_WALK_SPEED : -PET_WALK_SPEED;
+        motion.nextDecisionAt = nowMs + 1_200 + Math.random() * 1_800;
+      } else if (motion.state === 'walk' && nowMs >= motion.nextDecisionAt) {
+        if (Math.random() < 0.35) {
+          motion.state = 'jump';
+          motion.vy = PET_JUMP_VELOCITY;
+          motion.nextDecisionAt = nowMs + 1_800;
+        } else {
+          motion.state = 'idle';
+          motion.vx = 0;
+          motion.nextDecisionAt = nowMs + 900 + Math.random() * 1_100;
+        }
+      }
+    }
+
+    if (motion.state === 'walk') {
+      nextPet.x += motion.vx * deltaSec;
+    }
+
+    if (motion.state === 'jump' || motion.state === 'fall') {
+      motion.vy += PET_GRAVITY * deltaSec;
+      nextPet.x += motion.vx * deltaSec;
+      nextPet.y += motion.vy * deltaSec;
+      if (motion.vy > 0 && motion.state === 'jump') {
+        motion.state = 'fall';
+      }
+    }
+
+    motion.vx *= PET_INERTIA_DAMPING;
+    if (Math.abs(motion.vx) < PET_MIN_VELOCITY && motion.state !== 'walk') {
+      motion.vx = 0;
+    }
+
+    nextPet = clampPetPosition(nextPet);
+    if (
+      nextPet.y >= groundY &&
+      (motion.state === 'jump' || (motion.state === 'fall' && motion.vy > 0))
+    ) {
+      nextPet.y = groundY;
+      motion.vy = 0;
+      motion.state = 'fall';
+      motion.landingUntil = nowMs + PET_LANDING_MS;
+    }
+
+    if (motion.state === 'fall' && motion.landingUntil > 0 && nowMs >= motion.landingUntil) {
+      motion.state = 'idle';
+      motion.landingUntil = 0;
+      motion.nextDecisionAt = nowMs + 1_000 + Math.random() * 1_500;
+    }
+
+    if (nextPet.x <= 0 || nextPet.x >= Math.max(0, playgroundElement.clientWidth - PET_NODE_SIZE)) {
+      if (motion.state === 'walk') {
+        motion.vx *= -1;
+      }
+    }
+
+    if (nextPet.x !== pet.x || nextPet.y !== pet.y) {
+      changed = true;
+    }
+    return nextPet;
+  });
+
+  if (!changed) {
+    return;
+  }
+
+  for (const pet of playgroundPets) {
+    const node = playgroundElement.querySelector(
+      `.playground-pet[data-pet-id="${pet.id}"]`,
+    ) as HTMLButtonElement | null;
+    if (!node) {
+      continue;
+    }
+    applyPetNodeVisual(node, pet);
+  }
+}
+
+function startLiveLoop(): void {
+  const tick = (ts: number): void => {
+    if (liveLoopLastTs === 0) {
+      liveLoopLastTs = ts;
+    }
+    const deltaSec = Math.max(0, Math.min(0.05, (ts - liveLoopLastTs) / 1_000));
+    liveLoopLastTs = ts;
+    stepPetMotion(deltaSec, ts);
+    liveLoopHandle = window.requestAnimationFrame(tick);
+  };
+  if (liveLoopHandle !== 0) {
+    window.cancelAnimationFrame(liveLoopHandle);
+  }
+  liveLoopLastTs = 0;
+  liveLoopHandle = window.requestAnimationFrame(tick);
+}
+
 function syncMainPetEmoji(): void {
   playgroundPets = playgroundPets.map((pet) =>
     pet.kind === 'main' ? { ...pet, emoji: STAGE_FACE_MAP[state.stage] } : pet,
@@ -448,22 +763,36 @@ function renderPlayground(): void {
   playgroundPets = playgroundPets.map(clampPetPosition);
 
   for (const pet of playgroundPets) {
+    const motion = ensurePetMotion(pet.id);
     const node = document.createElement('button');
     node.type = 'button';
-    node.className = `playground-pet${pet.id === selectedPetId ? ' selected' : ''}`;
-    node.textContent = pet.emoji;
-    node.style.left = `${pet.x}px`;
-    node.style.top = `${pet.y}px`;
+    node.className = `playground-pet ${pet.kind}`;
     node.dataset.petId = pet.id;
     node.title = pet.kind === 'main' ? '메인 캐릭터' : '보조 캐릭터';
+    if (pet.kind === 'main' && mainSpriteUrl) {
+      const sprite = document.createElement('img');
+      sprite.className = 'pet-sprite';
+      sprite.alt = 'main pet';
+      sprite.draggable = false;
+      sprite.src = mainSpriteUrl;
+      node.appendChild(sprite);
+    } else {
+      node.textContent = pet.emoji;
+    }
+    applyPetNodeVisual(node, pet);
 
     node.addEventListener('pointerdown', (event: PointerEvent) => {
       if (clickThroughEnabled) {
         return;
       }
+      if (!isMainPetOpaqueAt(node, event.clientX, event.clientY)) {
+        return;
+      }
 
       event.preventDefault();
       beginDragLock();
+      motion.dragging = true;
+      motion.state = 'drag';
       if (node.setPointerCapture) {
         try {
           node.setPointerCapture(event.pointerId);
@@ -476,11 +805,23 @@ function renderPlayground(): void {
       const originX = pet.x;
       const originY = pet.y;
       let moved = false;
+      let velocityX = 0;
+      let velocityY = 0;
+      let previousX = startX;
+      let previousY = startY;
+      let previousTs = performance.now();
       node.classList.add('dragging');
 
       const onPointerMove = (moveEvent: PointerEvent): void => {
+        const nowTs = performance.now();
         const deltaX = moveEvent.clientX - startX;
         const deltaY = moveEvent.clientY - startY;
+        const elapsed = Math.max(1, nowTs - previousTs) / 1_000;
+        velocityX = (moveEvent.clientX - previousX) / elapsed;
+        velocityY = (moveEvent.clientY - previousY) / elapsed;
+        previousX = moveEvent.clientX;
+        previousY = moveEvent.clientY;
+        previousTs = nowTs;
         if (Math.abs(deltaX) >= DRAG_THRESHOLD || Math.abs(deltaY) >= DRAG_THRESHOLD) {
           moved = true;
         }
@@ -490,17 +831,20 @@ function renderPlayground(): void {
         const index = playgroundPets.findIndex((item) => item.id === pet.id);
         if (index >= 0) {
           playgroundPets[index] = clampPetPosition({ ...playgroundPets[index], x: nextX, y: nextY });
-          node.style.left = `${playgroundPets[index].x}px`;
-          node.style.top = `${playgroundPets[index].y}px`;
+          applyPetNodeVisual(node, playgroundPets[index]);
         }
       };
 
       const onPointerUp = (): void => {
         window.removeEventListener('pointermove', onPointerMove);
         endDragLock();
+        motion.dragging = false;
         node.classList.remove('dragging');
         if (!moved) {
           selectedPetId = pet.id;
+          motion.state = 'idle';
+          motion.vx = 0;
+          motion.vy = 0;
           if (pet.kind === 'main') {
             setUiPanelVisible(!uiPanelVisible);
             overlayHintElement.textContent = uiPanelVisible
@@ -510,10 +854,15 @@ function renderPlayground(): void {
             overlayHintElement.textContent = '캐릭터 선택 완료';
           }
         } else {
+          motion.vx = velocityX * 0.08;
+          motion.vy = velocityY * 0.08;
+          motion.state = motion.vy < 0 ? 'jump' : 'fall';
+          motion.landingUntil = 0;
+          motion.nextDecisionAt = performance.now() + 1_200;
           overlayHintElement.textContent = '드래그 위치 저장 완료';
         }
         persistPlaygroundPets();
-        renderPlayground();
+        applyPetNodeVisual(node, playgroundPets.find((item) => item.id === pet.id) ?? pet);
       };
 
       window.addEventListener('pointermove', onPointerMove);
@@ -603,12 +952,16 @@ function updateActivityUI(): void {
 function updateHelpPanel(): void {
   helpPanelElement.textContent =
     `- 메인 캐릭터 클릭: 설정 UI를 열고/닫습니다.\n` +
-    `- 메인 캐릭터 드래그(컴팩트 화면): 현재 모니터 작업영역 안에서 자유롭게 이동합니다.\n` +
+    `- 메인 캐릭터 드래그: 관성 이동이 적용되며, 드래그 종료 후 잠깐 자연스럽게 미끄러집니다.\n` +
+    `- 클릭 경계: 메인 캐릭터는 PNG 알파(투명도) 기준으로 클릭 영역을 판정합니다.\n` +
+    `- 상태 머신: idle / walk / jump / fall / drag 상태로 전환되며 자동 움직임이 적용됩니다.\n` +
+    `- 착지 연출: 하단 지면(작업영역 하단) 도달 시 fall -> idle 전환으로 착지 효과를 냅니다.\n` +
     `- 스탯 패널 상단 '패널 이동' 드래그: 모니터 해상도 범위 안에서 패널만 이동합니다.\n` +
     `- ⚙ 설정: 표시할 모니터를 선택해 캐릭터 위치를 전환합니다.\n` +
     `- ESC: 열린 설정 UI를 닫습니다.\n` +
     `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
     `  (이미 100이라 변화가 없으면 EXP 없음)\n` +
+    `- 스탯 감소는 앱 실행 중에만 진행됩니다. 앱 종료 시간은 감소에 반영하지 않습니다.\n` +
     `- 활동 EXP(자동): 5분 샘플마다 시간/입력 집계로 자동 획득됩니다.\n` +
     `- EXP 획득(수동): 5분 쿨다운마다 +2 EXP를 받습니다.\n` +
     `- EXP 숫자(예: 10 / 30) 클릭: 입력 이벤트별 집계와 누적 시간을 표시합니다.`;
@@ -884,6 +1237,9 @@ activityCheckinButton.addEventListener('click', () => {
 });
 
 window.addEventListener('beforeunload', () => {
+  if (liveLoopHandle !== 0) {
+    window.cancelAnimationFrame(liveLoopHandle);
+  }
   persistSave(state);
   persistPlaygroundPets();
   persistActivitySnapshot(activitySnapshot);
@@ -891,6 +1247,8 @@ window.addEventListener('beforeunload', () => {
 });
 
 window.addEventListener('resize', () => {
+  playgroundPets = playgroundPets.map(clampPetPosition);
+  renderPlayground();
   if (uiPanelVisible) {
     applyUiPanelPosition();
   }
@@ -970,3 +1328,7 @@ updateHelpPanel();
 setUiPanelVisible(uiPanelVisible);
 bindActivitySignalEvents();
 render(state);
+startLiveLoop();
+void initializeSpritePipeline().then(() => {
+  renderPlayground();
+});

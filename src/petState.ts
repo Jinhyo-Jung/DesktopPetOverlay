@@ -293,18 +293,16 @@ export function persistSave(state: PetState | PetSave): void {
 }
 
 export function loadState(): PetState {
-  const now = new Date();
-  const nowIso = now.toISOString();
+  const nowIso = new Date().toISOString();
   const raw = readRawSave();
   const migrated = migrateSave(raw, nowIso);
-
-  const elapsedMs = now.getTime() - Date.parse(migrated.lastSeenTimestamp);
-  const elapsedMinutes = Number.isFinite(elapsedMs) ? Math.floor(elapsedMs / 60_000) : 0;
-  const decayed = applyDecay(migrated, elapsedMinutes, nowIso);
-  decayed.stage = deriveStage(decayed.exp);
-  persistSave(decayed);
-
-  return toState(decayed);
+  const bootSave: PetSave = {
+    ...migrated,
+    stage: deriveStage(migrated.exp),
+    lastSeenTimestamp: nowIso,
+  };
+  persistSave(bootSave);
+  return toState(bootSave);
 }
 
 export function runTick(current: PetState): PetState {

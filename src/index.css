@@ -120,7 +120,7 @@ h1 {
 }
 
 .overlay-row-toggle {
-  grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.2fr) auto auto minmax(0, 1fr);
 }
 
 .overlay-row-character {
@@ -201,11 +201,6 @@ h1 {
   -webkit-app-region: no-drag;
 }
 
-.help-button {
-  justify-self: start;
-  padding-inline: 12px;
-}
-
 .help-panel {
   margin: 0;
   font-size: 11px;
@@ -222,9 +217,9 @@ h1 {
   position: absolute;
   width: 88px;
   height: 88px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   display: grid;
   place-items: center;
   font-size: 48px;
@@ -234,12 +229,63 @@ h1 {
 }
 
 .playground-pet.selected {
-  border-color: #3568b0;
-  box-shadow: 0 0 0 2px rgba(53, 104, 176, 0.25);
+  filter: drop-shadow(0 0 8px rgba(53, 104, 176, 0.45));
 }
 
 .playground-pet.dragging {
   cursor: grabbing;
+}
+
+.playground-pet .pet-sprite {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+  user-select: none;
+  pointer-events: none;
+  transform-origin: 50% 82%;
+}
+
+.playground-pet.state-idle .pet-sprite {
+  animation: pet-idle 1.8s ease-in-out infinite;
+}
+
+.playground-pet.state-walk .pet-sprite {
+  animation: pet-walk 0.45s ease-in-out infinite alternate;
+}
+
+.playground-pet.state-jump .pet-sprite {
+  animation: pet-jump 0.22s ease-out;
+}
+
+.playground-pet.state-fall .pet-sprite {
+  animation: pet-fall 0.22s ease-in;
+}
+
+.playground-pet.state-drag .pet-sprite {
+  animation: none;
+  transform: rotate(-4deg) scale(1.03);
+}
+
+@keyframes pet-idle {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes pet-walk {
+  0% { transform: translateY(0) rotate(-1.5deg); }
+  100% { transform: translateY(-3px) rotate(1.5deg); }
+}
+
+@keyframes pet-jump {
+  0% { transform: scale(1.02, 0.98); }
+  100% { transform: scale(1, 1); }
+}
+
+@keyframes pet-fall {
+  0% { transform: scale(0.98, 1.03); }
+  100% { transform: scale(1.03, 0.95); }
 }
 
 .stats-panel {
