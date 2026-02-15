@@ -256,6 +256,9 @@ let clickThroughShortcut = 'Ctrl+Alt+Shift+O';
 let clickThroughShortcutRegistered = true;
 let characterSizeLevel = loadCharacterSizeLevel();
 let mainMotionMode = loadMainMotionMode();
+let defaultMainSpriteProfile: SpriteProfile | null = null;
+const spriteProfileMap = new Map<string, SpriteProfile>();
+const petFrameIndexMap = new Map<string, number>();
 let playgroundPets: PlaygroundPet[] = loadPlaygroundPets();
 let selectedPetId = playgroundPets[0]?.id ?? 'main';
 
@@ -273,9 +276,6 @@ let dragLockCount = 0;
 const petMotionMap = new Map<string, PetMotion>();
 let liveLoopHandle = 0;
 let liveLoopLastTs = 0;
-let defaultMainSpriteProfile: SpriteProfile | null = null;
-const spriteProfileMap = new Map<string, SpriteProfile>();
-const petFrameIndexMap = new Map<string, number>();
 
 const overlayBridge = window.overlayBridge;
 

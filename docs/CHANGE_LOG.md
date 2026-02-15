@@ -1,5 +1,9 @@
 # CHANGE_LOG
 
+## 2026-02-15T14:30:25+09:00
+- `DesktopPetOverlay.exe` 실행 시 캐릭터가 전혀 보이지 않던 치명 버그를 수정했다. 원인은 `code/src/renderer.ts` 모듈 초기화 시점에 `loadPlaygroundPets()`가 먼저 실행되며 `getSpriteProfileForPet()`를 호출했는데, 내부에서 참조하는 `spriteProfileMap`이 아직 초기화되지 않아 `ReferenceError(Cannot access 'Re' before initialization)`가 발생하던 순서 문제(TDZ)였다.
+- 선언 순서를 조정해 `defaultMainSpriteProfile`, `spriteProfileMap`, `petFrameIndexMap`을 `loadPlaygroundPets()` 호출보다 먼저 초기화하도록 변경했고, 패키징 exe 로그에서 해당 예외가 사라진 것을 확인했다.
+
 ## 2026-02-15T14:03:40+09:00
 - 코드 자산을 `code/` 하위로 일원화해 산재한 소스 구조를 정리했다. `src/`와 `scripts/`를 각각 `code/src/`, `code/scripts/`로 이동하고, Forge/Vite/CMake/HTML/npm 스크립트 경로를 전부 새 구조에 맞게 갱신해 빌드 체인을 복구했다.
 - 아이콘 동기화/패키지 후 아이콘 패치 스크립트의 루트 경로 계산을 `../../` 기준으로 보정해, `code/scripts` 이동 이후에도 `source/exe_icon3.png` -> `.ico` 생성 및 exe 아이콘 주입이 정상 동작하도록 수정했다.
