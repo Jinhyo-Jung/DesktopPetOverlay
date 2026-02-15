@@ -1,5 +1,10 @@
 # CHANGE_LOG
 
+## 2026-02-15T15:01:11+09:00
+- 8프레임 적용 후 캐릭터가 찢어진 것처럼 보이던 문제를 수정했다. 원인은 `source/01_cat_multiple_expression_variations.png`를 단순 8등분(`width=128, height=1024`)해 실제 캐릭터 경계와 맞지 않는 잘못된 프레임 좌표가 적용된 것이었다.
+- `source/pet_sprites/main_cat.json`의 프레임 좌표를 실제 캐릭터 바운딩 박스 기준으로 재작성하고, 4개 원본 포즈를 기반으로 8프레임 시퀀스(중복 포함)를 구성해 왜곡 없이 재생되도록 조정했다.
+- 수정 후 재패키징 산출물 `out/DesktopPetOverlay-win32-x64/resources/source/pet_sprites/main_cat.json`에 동일 좌표가 반영된 것을 확인했다.
+
 ## 2026-02-15T14:56:35+09:00
 - 패키징 exe에서 캐릭터 스프라이트 설정이 반영되지 않던 원인을 수정했다. 기존 산출물(`app.asar`)에 `source/`가 포함되지 않아 `source/pet_sprites/main_cat.json`(8프레임)을 런타임에 읽지 못했다.
 - `code/config/forge.config.ts`의 `packagerConfig.extraResource`에 `source`를 추가해 릴리즈 산출물에 `resources/source/**`가 함께 배포되도록 변경했다.
