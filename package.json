@@ -8,6 +8,7 @@
   "scripts": {
     "start": "electron-forge start",
     "icon:sync": "node code/scripts/sync-icon.mjs",
+    "sprite:extract-emotions": "powershell -NoProfile -ExecutionPolicy Bypass -File code/scripts/extract-main-cat-emotions.ps1",
     "sprite:gen8": "node code/scripts/generate-8frame-json.mjs",
     "prepackage": "npm run icon:sync",
     "package": "electron-forge package",

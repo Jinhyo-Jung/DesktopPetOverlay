@@ -1,44 +1,19 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "main-cat",
-  "image": "source/01_cat_multiple_expression_variations.png",
   "defaultFps": 8,
   "hitAlphaThreshold": 24,
-  "frames": [
-    { "x": 85, "y": 122, "width": 327, "height": 353 },
-    { "x": 613, "y": 122, "width": 321, "height": 353 },
-    { "x": 84, "y": 603, "width": 296, "height": 325 },
-    { "x": 621, "y": 683, "width": 344, "height": 236 },
-    { "x": 613, "y": 122, "width": 321, "height": 353 },
-    { "x": 85, "y": 122, "width": 327, "height": 353 },
-    { "x": 621, "y": 683, "width": 344, "height": 236 },
-    { "x": 84, "y": 603, "width": 296, "height": 325 }
+  "frameImages": [
+    { "id": "neutral", "image": "source/pet_emotions/main_cat/neutral.png" },
+    { "id": "happy", "image": "source/pet_emotions/main_cat/happy.png" },
+    { "id": "tired", "image": "source/pet_emotions/main_cat/tired.png" },
+    { "id": "sleep", "image": "source/pet_emotions/main_cat/sleep.png" }
   ],
   "states": {
-    "idle": {
-      "frames": [0, 1, 0, 3, 0, 4, 0, 6],
-      "fps": 3,
-      "loop": true
-    },
-    "walk": {
-      "frames": [2, 1, 0, 4, 2, 6, 7, 5],
-      "fps": 9,
-      "loop": true
-    },
-    "jump": {
-      "frames": [1, 0, 4],
-      "fps": 8,
-      "loop": false
-    },
-    "fall": {
-      "frames": [6, 3, 7],
-      "fps": 8,
-      "loop": true
-    },
-    "drag": {
-      "frames": [0],
-      "fps": 1,
-      "loop": true
-    }
+    "idle": { "emotions": ["neutral", "neutral", "happy", "neutral", "sleep"], "fps": 2, "loop": true },
+    "walk": { "emotions": ["neutral", "happy", "neutral", "happy"], "fps": 6, "loop": true },
+    "jump": { "emotions": ["happy", "neutral"], "fps": 7, "loop": false },
+    "fall": { "emotions": ["tired", "sleep"], "fps": 6, "loop": true },
+    "drag": { "emotions": ["neutral"], "fps": 1, "loop": true }
   }
 }

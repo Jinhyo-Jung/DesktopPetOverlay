@@ -1,5 +1,12 @@
 # CHANGE_LOG
 
+## 2026-02-15T15:09:17+09:00
+- 메인 캐릭터 스프라이트를 "등분 파일 + 이모션 매핑" 방식으로 전환했다. `source/01_cat_multiple_expression_variations.png`를 2x2로 분할해 `source/pet_emotions/main_cat/{neutral,happy,tired,sleep}.png`를 생성하고, `source/pet_sprites/main_cat.json`에서 `frameImages` + `states.emotions` 기반으로 상태별 표정을 지정하도록 변경했다.
+- 렌더러 스프라이트 파서를 확장해 기존 atlas(`image + frames`) 방식과 신규 분할 이미지(`frameImages + emotions`) 방식을 모두 지원하게 했다. 상태 정의는 `frames` 또는 `emotions` 둘 다 허용하며, 이모션 ID를 프레임 인덱스로 해석해 재생한다.
+- 표정 급변 완화를 위해 idle 표정 전환 간격을 늘리고(약 3~8초), `neutral` 가중치를 높인 선택 로직을 적용했다.
+- 반복 사용을 위해 `code/scripts/extract-main-cat-emotions.ps1`를 추가하고 `package.json`에 `sprite:extract-emotions` 명령을 등록했다.
+- 검증으로 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`, exe 실행 스모크 테스트를 통과했고, 패키징 산출물에 분할 이모션 PNG 4개가 포함됨을 확인했다.
+
 ## 2026-02-15T15:01:11+09:00
 - 8프레임 적용 후 캐릭터가 찢어진 것처럼 보이던 문제를 수정했다. 원인은 `source/01_cat_multiple_expression_variations.png`를 단순 8등분(`width=128, height=1024`)해 실제 캐릭터 경계와 맞지 않는 잘못된 프레임 좌표가 적용된 것이었다.
 - `source/pet_sprites/main_cat.json`의 프레임 좌표를 실제 캐릭터 바운딩 박스 기준으로 재작성하고, 4개 원본 포즈를 기반으로 8프레임 시퀀스(중복 포함)를 구성해 왜곡 없이 재생되도록 조정했다.

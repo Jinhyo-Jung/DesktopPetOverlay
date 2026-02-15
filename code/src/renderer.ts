@@ -153,7 +153,8 @@ interface PetMotion {
 interface PetSpriteConfig {
   version: number;
   name: string;
-  image: string;
+  image?: string;
+  frameImages?: SpriteFrameImageConfig[];
   frameWidth?: number;
   frameHeight?: number;
   frameCount?: number;
@@ -170,8 +171,14 @@ interface SpriteFrameRect {
   height: number;
 }
 
+interface SpriteFrameImageConfig {
+  id: string;
+  image: string;
+}
+
 interface SpriteStateConfig {
-  frames: number[];
+  frames?: number[];
+  emotions?: string[];
   fps?: number;
   loop?: boolean;
 }
@@ -184,10 +191,11 @@ interface SpriteStateRuntime {
 
 interface SpriteProfile {
   key: string;
-  imageUrl: string;
-  image: HTMLImageElement;
+  imageUrls: string[];
+  frameImages: HTMLImageElement[];
   frames: SpriteFrameRect[];
   frameAlphaData: Array<ImageData | null>;
+  frameEmotionIds: Array<string | null>;
   states: Record<PetVisualState, SpriteStateRuntime>;
   hitAlphaThreshold: number;
   groundInsetRatio: number;
@@ -404,10 +412,7 @@ function parseSpriteConfig(raw: unknown): PetSpriteConfig | null {
     return null;
   }
   const record = raw as Record<string, unknown>;
-  const image = typeof record.image === 'string' ? record.image.trim() : '';
-  if (!image) {
-    return null;
-  }
+  const image = typeof record.image === 'string' ? record.image.trim() : undefined;
 
   const parseFiniteNumber = (value: unknown): number | null =>
     Number.isFinite(value) ? Number(value) : null;
@@ -440,19 +445,40 @@ function parseSpriteConfig(raw: unknown): PetSpriteConfig | null {
       return null;
     }
     const item = value as Record<string, unknown>;
-    if (!Array.isArray(item.frames)) {
-      return null;
-    }
-    const frames = item.frames
-      .map((frameIndex) => (Number.isFinite(frameIndex) ? Math.floor(Number(frameIndex)) : -1))
-      .filter((frameIndex) => frameIndex >= 0);
-    if (frames.length === 0) {
+    const frames = Array.isArray(item.frames)
+      ? item.frames
+          .map((frameIndex) => (Number.isFinite(frameIndex) ? Math.floor(Number(frameIndex)) : -1))
+          .filter((frameIndex) => frameIndex >= 0)
+      : [];
+    const emotions = Array.isArray(item.emotions)
+      ? item.emotions
+          .map((emotion) => (typeof emotion === 'string' ? emotion.trim() : ''))
+          .filter((emotion) => emotion.length > 0)
+      : [];
+    if (frames.length === 0 && emotions.length === 0) {
       return null;
     }
     return {
-      frames,
+      frames: frames.length > 0 ? frames : undefined,
+      emotions: emotions.length > 0 ? emotions : undefined,
       fps: Number.isFinite(item.fps) ? Math.max(1, Number(item.fps)) : undefined,
       loop: typeof item.loop === 'boolean' ? item.loop : undefined,
+    };
+  };
+
+  const parseFrameImageConfig = (value: unknown): SpriteFrameImageConfig | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    const item = value as Record<string, unknown>;
+    const id = typeof item.id === 'string' ? item.id.trim() : '';
+    const frameImage = typeof item.image === 'string' ? item.image.trim() : '';
+    if (!id || !frameImage) {
+      return null;
+    }
+    return {
+      id,
+      image: frameImage,
     };
   };
 
@@ -473,6 +499,15 @@ function parseSpriteConfig(raw: unknown): PetSpriteConfig | null {
   const parsedFrames = Array.isArray(record.frames)
     ? record.frames.map(parseFrameRect).filter((frame): frame is SpriteFrameRect => Boolean(frame))
     : undefined;
+  const parsedFrameImages = Array.isArray(record.frameImages)
+    ? record.frameImages
+        .map(parseFrameImageConfig)
+        .filter((item): item is SpriteFrameImageConfig => Boolean(item))
+    : undefined;
+
+  if (!image && (!parsedFrameImages || parsedFrameImages.length === 0)) {
+    return null;
+  }
 
   const frameWidth = Number.isFinite(record.frameWidth)
     ? Math.max(1, Math.floor(Number(record.frameWidth)))
@@ -488,6 +523,7 @@ function parseSpriteConfig(raw: unknown): PetSpriteConfig | null {
     version: Number.isFinite(record.version) ? Number(record.version) : 1,
     name: typeof record.name === 'string' ? record.name : 'main',
     image,
+    frameImages: parsedFrameImages,
     frameWidth,
     frameHeight,
     frameCount,
@@ -523,14 +559,14 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-async function resolveSpriteImageUrl(config: PetSpriteConfig): Promise<string | null> {
+async function resolveAssetUrl(assetPath: string): Promise<string | null> {
   const candidates = [
-    config.image,
-    `./${config.image}`,
-    `../${config.image}`,
-    `../../${config.image}`,
-    `../../../${config.image}`,
-    `../../../../${config.image}`,
+    assetPath,
+    `./${assetPath}`,
+    `../${assetPath}`,
+    `../../${assetPath}`,
+    `../../../${assetPath}`,
+    `../../../../${assetPath}`,
   ];
   for (const candidate of candidates) {
     try {
@@ -614,7 +650,11 @@ function resolveSpriteFrames(config: PetSpriteConfig, image: HTMLImageElement): 
       ];
 }
 
-function resolveSpriteStates(config: PetSpriteConfig, frameCount: number): Record<PetVisualState, SpriteStateRuntime> {
+function resolveSpriteStates(
+  config: PetSpriteConfig,
+  frameCount: number,
+  emotionFrameMap?: Map<string, number>,
+): Record<PetVisualState, SpriteStateRuntime> {
   const fallback: Record<PetVisualState, SpriteStateRuntime> = {
     idle: { frames: [0], fps: 2, loop: true },
     walk: { frames: [0], fps: 8, loop: true },
@@ -625,12 +665,20 @@ function resolveSpriteStates(config: PetSpriteConfig, frameCount: number): Recor
   const defaultFps = config.defaultFps ?? 8;
   for (const stateName of Object.keys(fallback) as PetVisualState[]) {
     const rawState = config.states?.[stateName];
-    if (!rawState || rawState.frames.length === 0) {
+    if (!rawState) {
       continue;
     }
-    const frames = rawState.frames.filter(
+
+    const directFrames = (rawState.frames ?? []).filter(
       (frameIndex) => frameIndex >= 0 && frameIndex < frameCount,
     );
+    const emotionFrames =
+      emotionFrameMap && rawState.emotions
+        ? rawState.emotions
+            .map((emotionId) => emotionFrameMap.get(emotionId))
+            .filter((frameIndex): frameIndex is number => Number.isFinite(frameIndex))
+        : [];
+    const frames = directFrames.length > 0 ? directFrames : emotionFrames;
     if (frames.length === 0) {
       continue;
     }
@@ -680,21 +728,51 @@ function estimateGroundInsetRatio(
   return Math.max(0, Math.min(0.35, median));
 }
 
+interface ResolvedFrameImage {
+  id: string;
+  url: string;
+  image: HTMLImageElement;
+}
+
 function createSpriteProfile(
   config: PetSpriteConfig,
-  imageUrl: string,
-  image: HTMLImageElement,
+  atlas: { imageUrl: string; image: HTMLImageElement } | null,
+  frameImages: ResolvedFrameImage[],
 ): SpriteProfile {
-  const frames = resolveSpriteFrames(config, image);
+  const frames =
+    frameImages.length > 0
+      ? frameImages.map((frameImage) => ({
+          x: 0,
+          y: 0,
+          width: frameImage.image.naturalWidth,
+          height: frameImage.image.naturalHeight,
+        }))
+      : resolveSpriteFrames(config, atlas?.image as HTMLImageElement);
+  const frameSources =
+    frameImages.length > 0 ? frameImages.map((frameImage) => frameImage.image) : frames.map(() => atlas?.image as HTMLImageElement);
+  const frameEmotionIds =
+    frameImages.length > 0 ? frameImages.map((frameImage) => frameImage.id) : frames.map(() => null);
   const hitAlphaThreshold = config.hitAlphaThreshold ?? 12;
-  const frameAlphaData = frames.map((frame) => buildFrameAlphaData(image, frame));
+  const frameAlphaData = frames.map((frame, index) => buildFrameAlphaData(frameSources[index], frame));
+  const emotionFrameMap = new Map<string, number>();
+  frameEmotionIds.forEach((emotionId, index) => {
+    if (emotionId && !emotionFrameMap.has(emotionId)) {
+      emotionFrameMap.set(emotionId, index);
+    }
+  });
+
   return {
     key: config.name,
-    imageUrl,
-    image,
+    imageUrls: frameImages.length > 0 ? frameImages.map((frameImage) => frameImage.url) : [atlas?.imageUrl ?? ''],
+    frameImages: frameSources,
     frames,
     frameAlphaData,
-    states: resolveSpriteStates(config, frames.length),
+    frameEmotionIds,
+    states: resolveSpriteStates(
+      config,
+      frames.length,
+      emotionFrameMap.size > 0 ? emotionFrameMap : undefined,
+    ),
     hitAlphaThreshold,
     groundInsetRatio: estimateGroundInsetRatio(frameAlphaData, hitAlphaThreshold),
   };
@@ -723,12 +801,44 @@ async function initializeSpritePipeline(): Promise<void> {
     if (!config) {
       continue;
     }
-    const resolved = await resolveSpriteImageUrl(config);
-    if (!resolved) {
+
+    let atlas: { imageUrl: string; image: HTMLImageElement } | null = null;
+    const resolvedFrameImages: ResolvedFrameImage[] = [];
+
+    if (config.image) {
+      const resolvedAtlas = await resolveAssetUrl(config.image);
+      if (resolvedAtlas) {
+        atlas = {
+          imageUrl: resolvedAtlas,
+          image: await loadImage(resolvedAtlas),
+        };
+      }
+    }
+
+    if (config.frameImages && config.frameImages.length > 0) {
+      let allResolved = true;
+      for (const frameImage of config.frameImages) {
+        const resolved = await resolveAssetUrl(frameImage.image);
+        if (!resolved) {
+          allResolved = false;
+          break;
+        }
+        resolvedFrameImages.push({
+          id: frameImage.id,
+          url: resolved,
+          image: await loadImage(resolved),
+        });
+      }
+      if (!allResolved) {
+        continue;
+      }
+    }
+
+    if (!atlas && resolvedFrameImages.length === 0) {
       continue;
     }
-    const image = await loadImage(resolved);
-    const profile = createSpriteProfile(config, resolved, image);
+
+    const profile = createSpriteProfile(config, atlas, resolvedFrameImages);
     registerSpriteProfile(profile);
     if (!defaultMainSpriteProfile) {
       defaultMainSpriteProfile = profile;
@@ -885,9 +995,19 @@ function updateIdleExpressionFrame(pet: PlaygroundPet, motion: PetMotion, nowMs:
   }
   const candidateFrames = idleFrames.filter((frameIndex) => frameIndex !== motion.expressionFrameIndex);
   const framePool = candidateFrames.length > 0 ? candidateFrames : idleFrames;
-  const nextFrame = framePool[Math.floor(Math.random() * framePool.length)] ?? idleFrames[0];
+  const weightedFramePool: number[] = [];
+  for (const frameIndex of framePool) {
+    const emotionId = profile.frameEmotionIds[frameIndex] ?? '';
+    const weight =
+      emotionId === 'neutral' ? 8 : emotionId === 'happy' ? 3 : emotionId === 'sleep' ? 2 : 1;
+    for (let repeat = 0; repeat < weight; repeat += 1) {
+      weightedFramePool.push(frameIndex);
+    }
+  }
+  const pickPool = weightedFramePool.length > 0 ? weightedFramePool : framePool;
+  const nextFrame = pickPool[Math.floor(Math.random() * pickPool.length)] ?? idleFrames[0];
   motion.expressionFrameIndex = nextFrame;
-  motion.nextExpressionAt = nowMs + 900 + Math.random() * 2_300;
+  motion.nextExpressionAt = nowMs + 3_000 + Math.random() * 5_000;
 }
 
 function drawSpriteFrame(node: HTMLButtonElement, pet: PlaygroundPet, motion: PetMotion, nowMs: number): void {
@@ -909,8 +1029,12 @@ function drawSpriteFrame(node: HTMLButtonElement, pet: PlaygroundPet, motion: Pe
   }
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const sourceImage = profile.frameImages[frameIndex] ?? profile.frameImages[0];
+  if (!sourceImage) {
+    return;
+  }
   ctx.drawImage(
-    profile.image,
+    sourceImage,
     frame.x,
     frame.y,
     frame.width,
