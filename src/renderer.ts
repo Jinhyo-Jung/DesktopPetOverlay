@@ -1478,6 +1478,37 @@ function applyMainMotionMode(mode: MainMotionMode): void {
   renderPlayground();
 }
 
+function applyCharacterSizeLevel(nextLevel: number): void {
+  const clamped = clampCharacterSizeLevel(nextLevel);
+  if (clamped === characterSizeLevel) {
+    updateCharacterSettingsUI();
+    return;
+  }
+
+  const oldSize = getCurrentPetSize();
+  characterSizeLevel = clamped;
+  persistCharacterSizeLevel();
+  const newSize = getCurrentPetSize();
+
+  if (oldSize !== newSize) {
+    playgroundPets = playgroundPets.map((pet) => {
+      const anchorX = pet.x + oldSize / 2;
+      const anchorY = pet.y + oldSize;
+      return clampPetPosition({
+        ...pet,
+        x: anchorX - newSize / 2,
+        y: anchorY - newSize,
+      });
+    });
+  }
+
+  realignPetPositionsForViewport(performance.now());
+  updateCharacterSettingsUI();
+  persistPlaygroundPets();
+  renderPlayground();
+  overlayHintElement.textContent = `캐릭터 크기를 ${characterSizeLevel} 단계로 변경했습니다.`;
+}
+
 function syncMainMotionModeOnBoot(): void {
   if (isMainMotionRandom()) {
     return;
@@ -1749,19 +1780,11 @@ settingsButton.addEventListener('click', async () => {
 });
 
 characterSizeSlider.addEventListener('input', () => {
-  const nextLevel = clampCharacterSizeLevel(Number(characterSizeSlider.value));
-  if (nextLevel === characterSizeLevel) {
-    updateCharacterSettingsUI();
-    return;
-  }
+  applyCharacterSizeLevel(Number(characterSizeSlider.value));
+});
 
-  characterSizeLevel = nextLevel;
-  persistCharacterSizeLevel();
-  realignPetPositionsForViewport(performance.now());
-  updateCharacterSettingsUI();
-  persistPlaygroundPets();
-  renderPlayground();
-  overlayHintElement.textContent = `캐릭터 크기를 ${characterSizeLevel} 단계로 변경했습니다.`;
+characterSizeSlider.addEventListener('change', () => {
+  applyCharacterSizeLevel(Number(characterSizeSlider.value));
 });
 
 mainMotionModeSelect.addEventListener('change', () => {
