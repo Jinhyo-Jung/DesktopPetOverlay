@@ -5,7 +5,7 @@ import { rcedit } from 'rcedit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
+const rootDir = path.resolve(__dirname, '..', '..');
 const icoPath = path.join(rootDir, 'source', 'exe_icon3.ico');
 const exePath = path.join(rootDir, 'out', 'DesktopPetOverlay-win32-x64', 'DesktopPetOverlay.exe');
 

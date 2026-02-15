@@ -5,11 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(OverlayBreathingPreview WIN32
-    src/Main.cpp
-    src/Renderer.cpp
+    code/src/Main.cpp
+    code/src/Renderer.cpp
 )
 
-target_include_directories(OverlayBreathingPreview PRIVATE src)
+target_include_directories(OverlayBreathingPreview PRIVATE code/src)
 
 target_link_libraries(OverlayBreathingPreview PRIVATE
     d2d1

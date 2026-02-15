@@ -1,5 +1,11 @@
 # CHANGE_LOG
 
+## 2026-02-15T14:03:40+09:00
+- 코드 자산을 `code/` 하위로 일원화해 산재한 소스 구조를 정리했다. `src/`와 `scripts/`를 각각 `code/src/`, `code/scripts/`로 이동하고, Forge/Vite/CMake/HTML/npm 스크립트 경로를 전부 새 구조에 맞게 갱신해 빌드 체인을 복구했다.
+- 아이콘 동기화/패키지 후 아이콘 패치 스크립트의 루트 경로 계산을 `../../` 기준으로 보정해, `code/scripts` 이동 이후에도 `source/exe_icon3.png` -> `.ico` 생성 및 exe 아이콘 주입이 정상 동작하도록 수정했다.
+- 8프레임 작업 효율화를 위해 `code/scripts/generate-8frame-json.mjs`를 추가했다. PNG 스프라이트시트를 입력받아 프레임 사각형과 기본 상태(`idle/walk/jump/fall/drag`)가 포함된 JSON(`source/pet_sprites/*.json`)을 자동 생성한다.
+- `package.json`에 `sprite:gen8` 명령을 추가해 8프레임 JSON 생성을 CLI로 바로 실행할 수 있게 했다.
+
 ## 2026-02-15T13:25:21+09:00
 - 캐릭터가 작업표시줄 위에 착지하지 않고 공중에 떠 보이던 문제를 수정했다. 스프라이트 하단 투명 여백을 프레임 알파 데이터로 추정해(`groundInsetRatio`) 지면 계산/클램프/기본 위치에 반영하도록 렌더러 지면 로직을 재구성했다.
 - 크기 변경 시 발 위치 고정 계산에서도 스프라이트 하단 인셋을 반영해, 스케일 변경 직후 착지 높이가 흔들리지 않도록 보정했다.
