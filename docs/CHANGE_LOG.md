@@ -1,5 +1,8 @@
 # CHANGE_LOG
 
+## 2026-02-15T15:13:42+09:00
+- 메인 캐릭터 주변에 옅게 보이던 사각 경계(버튼 공통 스타일 잔여)를 제거했다. `code/src/index.css`의 `.playground-pet`에 `padding: 0`, `box-shadow: none`, `appearance: none`, `outline: none`를 명시하고, focus/focus-visible에서도 경계선이 표시되지 않도록 보강했다.
+
 ## 2026-02-15T15:09:17+09:00
 - 메인 캐릭터 스프라이트를 "등분 파일 + 이모션 매핑" 방식으로 전환했다. `source/01_cat_multiple_expression_variations.png`를 2x2로 분할해 `source/pet_emotions/main_cat/{neutral,happy,tired,sleep}.png`를 생성하고, `source/pet_sprites/main_cat.json`에서 `frameImages` + `states.emotions` 기반으로 상태별 표정을 지정하도록 변경했다.
 - 렌더러 스프라이트 파서를 확장해 기존 atlas(`image + frames`) 방식과 신규 분할 이미지(`frameImages + emotions`) 방식을 모두 지원하게 했다. 상태 정의는 `frames` 또는 `emotions` 둘 다 허용하며, 이모션 ID를 프레임 인덱스로 해석해 재생한다.
