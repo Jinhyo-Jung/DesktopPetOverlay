@@ -16,6 +16,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: windowsIconBasePath,
+    extraResource: [path.resolve(rootDir, 'source')],
   },
   rebuildConfig: {},
   makers: [

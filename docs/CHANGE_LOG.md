@@ -1,5 +1,11 @@
 # CHANGE_LOG
 
+## 2026-02-15T14:56:35+09:00
+- 패키징 exe에서 캐릭터 스프라이트 설정이 반영되지 않던 원인을 수정했다. 기존 산출물(`app.asar`)에 `source/`가 포함되지 않아 `source/pet_sprites/main_cat.json`(8프레임)을 런타임에 읽지 못했다.
+- `code/config/forge.config.ts`의 `packagerConfig.extraResource`에 `source`를 추가해 릴리즈 산출물에 `resources/source/**`가 함께 배포되도록 변경했다.
+- `code/src/main.ts`의 아이콘 경로 해석을 보강해 패키징 실행 시 `process.resourcesPath/source/exe_icon3.ico`를 우선 사용하도록 수정했다.
+- 재패키징 후 `out/DesktopPetOverlay-win32-x64/resources/source/pet_sprites/main_cat.json`이 포함되고 프레임 수가 8개임을 확인했다.
+
 ## 2026-02-15T14:51:27+09:00
 - 요청에 따라 `sprite:gen8` 생성 결과를 메인 캐릭터 설정에 실제 적용했다. `source/pet_sprites/main_cat.json`을 8프레임 상태맵(`idle/walk/jump/fall/drag`)으로 재생성하고 이름을 `main-cat`으로 유지해 기존 메인 캐릭터 키와 호환되도록 반영했다.
 - 적용 후 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`, `out/DesktopPetOverlay-win32-x64/DesktopPetOverlay.exe` 실행 스모크 테스트를 통과했다.

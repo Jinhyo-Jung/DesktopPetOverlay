@@ -221,10 +221,18 @@ const getLaunchDisplay = (): Electron.Display => {
 };
 
 const resolveWindowIconPath = (): string => {
+  const resourcesIcoPath = path.join(process.resourcesPath, 'source', 'exe_icon3.ico');
+  const resourcesPngPath = path.join(process.resourcesPath, 'source', 'exe_icon3.png');
   const packagedIcoPath = path.join(process.resourcesPath, 'app.asar', 'source', 'exe_icon3.ico');
   const devIcoPath = path.join(app.getAppPath(), 'source', 'exe_icon3.ico');
   const devPngPath = path.join(app.getAppPath(), 'source', 'exe_icon3.png');
 
+  if (app.isPackaged && fs.existsSync(resourcesIcoPath)) {
+    return resourcesIcoPath;
+  }
+  if (app.isPackaged && fs.existsSync(resourcesPngPath)) {
+    return resourcesPngPath;
+  }
   if (app.isPackaged && fs.existsSync(packagedIcoPath)) {
     return packagedIcoPath;
   }
