@@ -1,5 +1,12 @@
 # CHANGE_LOG
 
+## 2026-02-15T16:36:08+09:00
+- `source/pet_emotions/main_cat/`를 성장기 기준으로 분리했다. `egg/`, `baby/`, `teen/`, `adult/` 폴더를 만들고 기존 메인 캐릭터 이모션 PNG를 `adult/`로 이동했다.
+- 런타임 경로가 깨지지 않도록 `source/pet_sprites/main_cat.json`의 `frameImages` 경로를 `source/pet_emotions/main_cat/adult/*`로 갱신했다.
+- 분리 저장 기준을 명확히 하기 위해 `source/pet_emotions/main_cat/README.md`를 추가했다.
+- 아기/청소년/성체 3개 성장기의 이모션 생성용 프롬프트 문서를 `docs/design/growth-stage-emotion-prompts.md`로 추가했다.
+- 검증으로 `npm run lint`를 실행해 통과했다.
+
 ## 2026-02-15T16:29:09+09:00
 - 점프/낙하 중 메인 캐릭터 이미지가 갑자기 `sleep`으로 바뀌던 문제를 수정했다. `code/src/renderer.ts`에 공중 상태 프레임 잠금(`mainAirborneFrameLockIndex`)을 추가해 점프 시작 직전 이미지를 유지하도록 변경했다.
 - 성장 초기화 후 `Stage: Egg`인데도 성체 스프라이트가 보이던 문제를 수정했다. `code/src/renderer.ts`의 `getSpriteProfileForPet()`에서 `Egg` 단계 메인 캐릭터는 스프라이트를 비활성화하고 알 이모지 표시를 우선하도록 조정했다.
