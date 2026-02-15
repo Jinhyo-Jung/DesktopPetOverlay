@@ -1,5 +1,11 @@
 # CHANGE_LOG
 
+## 2026-02-15T16:29:09+09:00
+- 점프/낙하 중 메인 캐릭터 이미지가 갑자기 `sleep`으로 바뀌던 문제를 수정했다. `code/src/renderer.ts`에 공중 상태 프레임 잠금(`mainAirborneFrameLockIndex`)을 추가해 점프 시작 직전 이미지를 유지하도록 변경했다.
+- 성장 초기화 후 `Stage: Egg`인데도 성체 스프라이트가 보이던 문제를 수정했다. `code/src/renderer.ts`의 `getSpriteProfileForPet()`에서 `Egg` 단계 메인 캐릭터는 스프라이트를 비활성화하고 알 이모지 표시를 우선하도록 조정했다.
+- 초기화 버튼 실행 시 감정 프레임 캐시를 함께 초기화하도록 보강해 이전 상태 이미지가 남지 않도록 했다.
+- 검증으로 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`, `out/DesktopPetOverlay-win32-x64/DesktopPetOverlay.exe` 실행 스모크 테스트를 수행했다.
+
 ## 2026-02-15T16:19:53+09:00
 - 패널 상단 캐릭터 이미지를 기존 이모지 고정값에서 실시간 스프라이트 동기화 방식으로 변경했다. `code/src/renderer.ts`에 `updatePanelFace()`를 추가해 현재 메인 캐릭터 프레임 이미지를 패널 상단에 표시하도록 반영했다.
 - 감정 선택 로직을 상태 기반으로 재구성했다. `happiness >= 90`이면 `happy`, `health <= 60`이면 `tired`, 일정 시간 상호작용이 없으면 `sleep/neutral`을 번갈아 선택하며, `happy` 계열은 5초마다 `happy.png/happy_01~03.png` 중 랜덤 전환하도록 구현했다.

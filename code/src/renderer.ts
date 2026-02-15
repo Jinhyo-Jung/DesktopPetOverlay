@@ -290,6 +290,7 @@ let nextInactiveEmotionSwitchAt = 0;
 let activeEmotionFrameIndex: number | null = null;
 let activeEmotionMode: MainEmotionMode | null = null;
 let nextEmotionFrameSwitchAt = 0;
+let mainAirborneFrameLockIndex: number | null = null;
 let uiPanelVisible = loadUiPanelVisible();
 let uiPanelPosition: UiPanelPosition | null = loadUiPanelPosition();
 let pointerCaptureState: boolean | null = null;
@@ -802,6 +803,9 @@ function registerSpriteProfile(profile: SpriteProfile): void {
 }
 
 function getSpriteProfileForPet(pet: PlaygroundPet): SpriteProfile | null {
+  if (pet.kind === 'main' && state.stage === 'Egg') {
+    return null;
+  }
   if (pet.spriteProfile) {
     const assigned = spriteProfileMap.get(pet.spriteProfile);
     if (assigned) {
@@ -1011,6 +1015,7 @@ function resolveMainEmotionFrameIndex(
   );
   const framePool = matchedFrames.length > 0 ? matchedFrames : runtimeFrames;
   const switchMs = emotionMode === 'happy' ? HAPPY_IMAGE_SWITCH_MS : INACTIVE_IMAGE_SWITCH_MS;
+  const isAirborne = motion.state === 'jump' || motion.state === 'fall';
 
   if (activeEmotionMode !== emotionMode) {
     activeEmotionMode = emotionMode;
@@ -1026,6 +1031,23 @@ function resolveMainEmotionFrameIndex(
     activeEmotionFrameIndex = pickDifferentRandomFrame(framePool, activeEmotionFrameIndex);
     nextEmotionFrameSwitchAt = nowMs + switchMs;
   }
+
+  if (isAirborne) {
+    if (mainAirborneFrameLockIndex === null) {
+      const previousFrame = petFrameIndexMap.get('main');
+      if (
+        Number.isFinite(previousFrame) &&
+        Number(previousFrame) >= 0 &&
+        Number(previousFrame) < profile.frames.length
+      ) {
+        mainAirborneFrameLockIndex = Number(previousFrame);
+      } else {
+        mainAirborneFrameLockIndex = activeEmotionFrameIndex ?? framePool[0] ?? 0;
+      }
+    }
+    return mainAirborneFrameLockIndex;
+  }
+  mainAirborneFrameLockIndex = null;
 
   if (motion.state === 'drag') {
     return framePool[0] ?? activeEmotionFrameIndex ?? 0;
@@ -2126,6 +2148,10 @@ resetGrowthButton.addEventListener('click', () => {
   sampleInputByType = createEmptyInputCounter();
   dailyActiveSeconds = 0;
   dailyInputByType = createEmptyInputCounter();
+  activeEmotionFrameIndex = null;
+  activeEmotionMode = null;
+  nextEmotionFrameSwitchAt = 0;
+  mainAirborneFrameLockIndex = null;
   markUserInteraction();
   overlayHintElement.textContent = '성장 내용을 초기화했습니다.';
   render(state);
