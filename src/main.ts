@@ -58,6 +58,7 @@ const WINDOW_EDGE_MARGIN_Y = 12;
 let mainWindow: BrowserWindow | null = null;
 let overlayPreferences: OverlayPreferences = { ...DEFAULT_PREFERENCES };
 let clickThroughShortcutRegistered = false;
+let pointerCaptureEnabled = true;
 
 const getPreferencesPath = (): string =>
   path.join(app.getPath('userData'), 'overlay-preferences.json');
@@ -100,6 +101,16 @@ const emitOverlayState = (): void => {
   }
 
   mainWindow.webContents.send('overlay:click-through-changed', getOverlayState());
+};
+
+const applyMouseIgnoreState = (): void => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const shouldIgnoreMouse =
+    overlayPreferences.clickThroughEnabled || !pointerCaptureEnabled;
+  mainWindow.setIgnoreMouseEvents(shouldIgnoreMouse, { forward: shouldIgnoreMouse });
 };
 
 const getCurrentDisplayId = (): number | null => {
@@ -162,7 +173,7 @@ const applyClickThrough = (enabled: boolean): boolean => {
     return nextEnabled;
   }
 
-  mainWindow.setIgnoreMouseEvents(nextEnabled, { forward: nextEnabled });
+  applyMouseIgnoreState();
   emitOverlayState();
   return nextEnabled;
 };
@@ -292,6 +303,11 @@ const registerIpcHandlers = (): void => {
   ipcMain.handle('overlay:toggle-click-through', () =>
     applyClickThrough(!overlayPreferences.clickThroughEnabled),
   );
+
+  ipcMain.handle('overlay:set-pointer-capture', (_event, enabled: unknown) => {
+    pointerCaptureEnabled = enabled === true;
+    applyMouseIgnoreState();
+  });
 
   ipcMain.handle('overlay:move-window-by', (_event, rawPayload: unknown) => {
     if (!mainWindow || mainWindow.isDestroyed()) {

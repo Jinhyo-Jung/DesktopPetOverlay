@@ -32,6 +32,7 @@ interface OverlayBridge {
   setClickThrough: (enabled: boolean) => Promise<boolean>;
   toggleClickThrough: () => Promise<boolean>;
   moveWindowBy: (payload: WindowMovePayload) => Promise<void>;
+  setPointerCapture: (enabled: boolean) => Promise<void>;
   getDisplays: () => Promise<DisplayInfo[]>;
   moveToDisplay: (displayId: number) => Promise<boolean>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
@@ -45,6 +46,8 @@ const overlayBridge: OverlayBridge = {
     ipcRenderer.invoke('overlay:toggle-click-through') as Promise<boolean>,
   moveWindowBy: (payload: WindowMovePayload) =>
     ipcRenderer.invoke('overlay:move-window-by', payload) as Promise<void>,
+  setPointerCapture: (enabled: boolean) =>
+    ipcRenderer.invoke('overlay:set-pointer-capture', enabled) as Promise<void>,
   getDisplays: () => ipcRenderer.invoke('overlay:get-displays') as Promise<DisplayInfo[]>,
   moveToDisplay: (displayId: number) =>
     ipcRenderer.invoke('overlay:move-to-display', displayId) as Promise<boolean>,

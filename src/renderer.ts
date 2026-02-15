@@ -44,6 +44,7 @@ interface OverlayBridge {
     anchorSize?: number;
     lockToTaskbar?: boolean;
   }) => Promise<void>;
+  setPointerCapture: (enabled: boolean) => Promise<void>;
   getDisplays: () => Promise<DisplayInfo[]>;
   moveToDisplay: (displayId: number) => Promise<boolean>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
@@ -182,6 +183,7 @@ let dailyInputByType = createEmptyInputCounter();
 let showDetailedMetrics = false;
 let uiPanelVisible = loadUiPanelVisible();
 let uiPanelPosition: UiPanelPosition | null = loadUiPanelPosition();
+let pointerCaptureState: boolean | null = null;
 
 const overlayBridge = window.overlayBridge;
 
@@ -288,11 +290,64 @@ function setUiPanelVisible(visible: boolean): void {
     requestAnimationFrame(() => applyUiPanelPosition());
   } else {
     displaySettingsPanel.classList.add('hidden');
+    persistUiPanelPosition();
     petUiPanelElement.classList.add('hidden');
     petCardElement.classList.remove('expanded');
     petCardElement.classList.add('compact');
   }
   persistUiPanelVisible();
+  syncPointerCaptureMode();
+}
+
+async function applyPointerCapture(enabled: boolean): Promise<void> {
+  if (!overlayBridge || pointerCaptureState === enabled) {
+    return;
+  }
+  pointerCaptureState = enabled;
+  try {
+    await overlayBridge.setPointerCapture(enabled);
+  } catch {
+    pointerCaptureState = null;
+  }
+}
+
+function shouldCapturePointerAt(clientX: number, clientY: number): boolean {
+  if (clickThroughEnabled) {
+    return false;
+  }
+
+  const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+  if (!target) {
+    return false;
+  }
+
+  if (uiPanelVisible) {
+    return Boolean(target.closest('#pet-ui-panel, .playground-pet'));
+  }
+
+  return Boolean(target.closest('.playground-pet'));
+}
+
+function syncPointerCaptureMode(pointerEvent?: PointerEvent): void {
+  if (!overlayBridge) {
+    return;
+  }
+
+  if (clickThroughEnabled) {
+    void applyPointerCapture(false);
+    return;
+  }
+
+  if (!pointerEvent) {
+    const hoveredSelector = uiPanelVisible
+      ? '#pet-ui-panel:hover, .playground-pet:hover'
+      : '.playground-pet:hover';
+    const hovered = document.querySelector(hoveredSelector);
+    void applyPointerCapture(Boolean(hovered) || uiPanelVisible);
+    return;
+  }
+
+  void applyPointerCapture(shouldCapturePointerAt(pointerEvent.clientX, pointerEvent.clientY));
 }
 
 function formatDuration(seconds: number): string {
@@ -485,6 +540,7 @@ function applyOverlayState(overlayState: OverlayState): void {
   clickThroughShortcut = overlayState.shortcut;
   clickThroughShortcutRegistered = overlayState.shortcutRegistered;
   updateClickThroughUI();
+  syncPointerCaptureMode();
 }
 
 async function refreshDisplayOptions(): Promise<void> {
@@ -540,7 +596,7 @@ function updateHelpPanel(): void {
   helpPanelElement.textContent =
     `- 메인 캐릭터 클릭: 설정 UI를 열고/닫습니다.\n` +
     `- 메인 캐릭터 드래그(컴팩트 화면): 캐릭터 기준으로 작업표시줄 위를 따라 이동합니다.\n` +
-    `- 스탯 패널 상단 '패널 이동' 드래그: 창 위치를 직접 이동합니다.\n` +
+    `- 스탯 패널 상단 '패널 이동' 드래그: 패널만 이동하며 캐릭터 위치는 유지됩니다.\n` +
     `- ⚙ 설정: 표시할 모니터를 선택해 캐릭터 위치를 전환합니다.\n` +
     `- ESC: 열린 설정 UI를 닫습니다.\n` +
     `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
@@ -694,9 +750,8 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
   event.preventDefault();
   const startX = event.clientX;
   const startY = event.clientY;
+  const origin = clampUiPanelPosition(uiPanelPosition ?? getDefaultUiPanelPosition());
   let moved = false;
-  let previousX = startX;
-  let previousY = startY;
 
   const onPointerMove = (moveEvent: PointerEvent): void => {
     const deltaX = moveEvent.clientX - startX;
@@ -704,19 +759,18 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
     if (Math.abs(deltaX) >= DRAG_THRESHOLD || Math.abs(deltaY) >= DRAG_THRESHOLD) {
       moved = true;
     }
-
-    const stepX = moveEvent.clientX - previousX;
-    const stepY = moveEvent.clientY - previousY;
-    previousX = moveEvent.clientX;
-    previousY = moveEvent.clientY;
-    if (stepX !== 0 || stepY !== 0) {
-      void overlayBridge?.moveWindowBy({ deltaX: stepX, deltaY: stepY, lockToTaskbar: false });
-    }
+    uiPanelPosition = clampUiPanelPosition({
+      x: origin.x + deltaX,
+      y: origin.y + deltaY,
+    });
+    petUiPanelElement.style.left = `${uiPanelPosition.x}px`;
+    petUiPanelElement.style.top = `${uiPanelPosition.y}px`;
   };
 
   const onPointerUp = (): void => {
     window.removeEventListener('pointermove', onPointerMove);
     if (moved) {
+      persistUiPanelPosition();
       overlayHintElement.textContent = '스탯 패널 위치 이동 완료';
     }
   };
@@ -861,6 +915,26 @@ expTextElement.addEventListener('click', () => {
 
 helpButton.addEventListener('click', () => {
   helpPanelElement.classList.toggle('hidden');
+});
+
+window.addEventListener('pointermove', (event: PointerEvent) => {
+  syncPointerCaptureMode(event);
+});
+
+window.addEventListener('pointerenter', (event: PointerEvent) => {
+  syncPointerCaptureMode(event);
+});
+
+window.addEventListener('pointerleave', () => {
+  if (!uiPanelVisible && !clickThroughEnabled) {
+    void applyPointerCapture(false);
+  }
+});
+
+window.addEventListener('blur', () => {
+  if (!clickThroughEnabled) {
+    void applyPointerCapture(false);
+  }
 });
 
 window.addEventListener('keydown', (event: KeyboardEvent) => {

@@ -17,7 +17,7 @@ body {
 body {
   background: transparent;
   overflow: hidden;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
 }
 
 .pet-shell {
@@ -40,6 +40,7 @@ body {
   overflow: hidden;
   -webkit-app-region: no-drag;
   touch-action: none;
+  pointer-events: none;
 }
 
 .pet-playground.editing {
@@ -61,6 +62,7 @@ body {
   padding: 12px;
   overflow-y: auto;
   -webkit-app-region: no-drag;
+  pointer-events: auto;
 }
 
 .pet-ui-panel.hidden {
@@ -227,6 +229,7 @@ h1 {
   font-size: 48px;
   cursor: grab;
   -webkit-app-region: no-drag;
+  pointer-events: auto;
 }
 
 .playground-pet.selected {
