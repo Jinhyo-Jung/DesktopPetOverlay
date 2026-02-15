@@ -84,6 +84,13 @@ body {
   font-size: 52px;
   line-height: 1;
   margin-top: 2px;
+  width: 86px;
+  height: 86px;
+  margin-left: auto;
+  margin-right: auto;
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 h1 {
@@ -174,6 +181,12 @@ h1 {
 
 .display-settings-panel input[type="range"] {
   width: 100%;
+}
+
+.danger-button {
+  color: #7b1e1e;
+  background: #ffe7e7;
+  border: 1px solid #e8b2b2;
 }
 
 .settings-inline {

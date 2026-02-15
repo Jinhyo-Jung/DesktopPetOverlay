@@ -4,16 +4,62 @@
   "defaultFps": 8,
   "hitAlphaThreshold": 24,
   "frameImages": [
-    { "id": "neutral", "image": "source/pet_emotions/main_cat/neutral.png" },
     { "id": "happy", "image": "source/pet_emotions/main_cat/happy.png" },
+    { "id": "happy_01", "image": "source/pet_emotions/main_cat/happy_01.png" },
+    { "id": "happy_02", "image": "source/pet_emotions/main_cat/happy_02.png" },
+    { "id": "happy_03", "image": "source/pet_emotions/main_cat/happy_03.png" },
+    { "id": "neutral", "image": "source/pet_emotions/main_cat/neutral.png" },
+    { "id": "neutral_01", "image": "source/pet_emotions/main_cat/neutral_01.png" },
+    { "id": "neutral_02", "image": "source/pet_emotions/main_cat/neutral_02.png" },
+    { "id": "neutral_03", "image": "source/pet_emotions/main_cat/neutral_03.png" },
+    { "id": "sleep", "image": "source/pet_emotions/main_cat/sleep.png" },
+    { "id": "sleep_01", "image": "source/pet_emotions/main_cat/sleep_01.png" },
+    { "id": "sleep_02", "image": "source/pet_emotions/main_cat/sleep_02.png" },
+    { "id": "sleep_03", "image": "source/pet_emotions/main_cat/sleep_03.png" },
     { "id": "tired", "image": "source/pet_emotions/main_cat/tired.png" },
-    { "id": "sleep", "image": "source/pet_emotions/main_cat/sleep.png" }
+    { "id": "tired_01", "image": "source/pet_emotions/main_cat/tired_01.png" }
   ],
   "states": {
-    "idle": { "emotions": ["neutral", "neutral", "happy", "neutral", "sleep"], "fps": 2, "loop": true },
-    "walk": { "emotions": ["neutral", "happy", "neutral", "happy"], "fps": 6, "loop": true },
-    "jump": { "emotions": ["happy", "neutral"], "fps": 7, "loop": false },
-    "fall": { "emotions": ["tired", "sleep"], "fps": 6, "loop": true },
-    "drag": { "emotions": ["neutral"], "fps": 1, "loop": true }
+    "idle": {
+      "emotions": [
+        "happy",
+        "happy_01",
+        "happy_02",
+        "happy_03",
+        "neutral",
+        "neutral_01",
+        "neutral_02",
+        "neutral_03",
+        "sleep",
+        "sleep_01",
+        "sleep_02",
+        "sleep_03",
+        "tired",
+        "tired_01"
+      ],
+      "fps": 2,
+      "loop": true
+    },
+    "walk": {
+      "emotions": [
+        "happy",
+        "happy_01",
+        "happy_02",
+        "happy_03",
+        "neutral",
+        "neutral_01",
+        "neutral_02",
+        "neutral_03"
+      ],
+      "fps": 6,
+      "loop": true
+    },
+    "jump": {
+      "emotions": ["happy", "happy_01", "happy_02", "happy_03", "neutral", "neutral_01", "neutral_02", "neutral_03"],
+      "fps": 7,
+      "loop": false
+    },
+    "fall": { "emotions": ["tired", "tired_01", "sleep", "sleep_01", "sleep_02", "sleep_03"], "fps": 6, "loop": true },
+    "drag": { "emotions": ["neutral", "neutral_01", "neutral_02", "neutral_03"], "fps": 1, "loop": true }
   }
 }

@@ -1,5 +1,12 @@
 # CHANGE_LOG
 
+## 2026-02-15T16:19:53+09:00
+- 패널 상단 캐릭터 이미지를 기존 이모지 고정값에서 실시간 스프라이트 동기화 방식으로 변경했다. `code/src/renderer.ts`에 `updatePanelFace()`를 추가해 현재 메인 캐릭터 프레임 이미지를 패널 상단에 표시하도록 반영했다.
+- 감정 선택 로직을 상태 기반으로 재구성했다. `happiness >= 90`이면 `happy`, `health <= 60`이면 `tired`, 일정 시간 상호작용이 없으면 `sleep/neutral`을 번갈아 선택하며, `happy` 계열은 5초마다 `happy.png/happy_01~03.png` 중 랜덤 전환하도록 구현했다.
+- 성장 초기화 기능을 설정 패널에 연결했다. `성장 내용 초기화` 버튼 클릭 시 확인 경고를 띄운 뒤 저장된 성장/활동 EXP 데이터를 초기화하고 처음 상태로 다시 시작하도록 `code/src/renderer.ts`에 핸들러를 추가했다.
+- 이모션 파일 매핑을 확장했다. `source/pet_sprites/main_cat.json`의 `frameImages`를 `happy/neutral/sleep/tired` 기본 + 변형 파일(`*_01~03`, `tired_01`)까지 포함하도록 갱신했다.
+- 검증으로 `npm run lint`, `npm run package -- --platform=win32 --arch=x64`를 실행했고, `out/DesktopPetOverlay-win32-x64/DesktopPetOverlay.exe` 실행 스모크 테스트(프로세스 기동/종료)까지 완료했다.
+
 ## 2026-02-15T15:13:42+09:00
 - 메인 캐릭터 주변에 옅게 보이던 사각 경계(버튼 공통 스타일 잔여)를 제거했다. `code/src/index.css`의 `.playground-pet`에 `padding: 0`, `box-shadow: none`, `appearance: none`, `outline: none`를 명시하고, focus/focus-visible에서도 경계선이 표시되지 않도록 보강했다.
 

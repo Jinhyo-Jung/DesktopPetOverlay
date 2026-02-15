@@ -95,6 +95,8 @@ const UI_PANEL_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-visible-v1';
 const UI_PANEL_POSITION_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-position-v1';
 const CHARACTER_SIZE_LEVEL_STORAGE_KEY = 'desktop-pet-overlay-character-size-level-v1';
 const MAIN_MOTION_MODE_STORAGE_KEY = 'desktop-pet-overlay-main-motion-mode-v1';
+const SAVE_STORAGE_KEY = 'desktop-pet-overlay-save';
+const ACTIVITY_STORAGE_KEY = 'desktop-pet-overlay-activity-exp-v1';
 const DRAG_THRESHOLD = 4;
 const PET_BASE_NODE_SIZE = 88;
 const MAIN_DEFAULT_MARGIN_X = 48;
@@ -117,9 +119,13 @@ const PET_SPRITE_CONFIG_CANDIDATES = [
   '../../../source/pet_sprites/main_cat.json',
   '../../../../source/pet_sprites/main_cat.json',
 ];
+const HAPPY_IMAGE_SWITCH_MS = 5_000;
+const IDLE_INACTIVE_THRESHOLD_MS = 45_000;
+const INACTIVE_IMAGE_SWITCH_MS = 7_000;
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 type MainMotionMode = 'random' | 'fixed';
+type MainEmotionMode = 'happy' | 'tired' | 'sleep' | 'neutral';
 
 interface PlaygroundPet {
   id: string;
@@ -247,6 +253,7 @@ const displayApplyButton = document.getElementById('display-apply-btn') as HTMLB
 const characterSizeSlider = document.getElementById('character-size-slider') as HTMLInputElement;
 const characterSizeValue = document.getElementById('character-size-value') as HTMLElement;
 const mainMotionModeSelect = document.getElementById('main-motion-mode-select') as HTMLSelectElement;
+const resetGrowthButton = document.getElementById('reset-growth-btn') as HTMLButtonElement;
 const activityOptToggleButton = document.getElementById(
   'activity-opt-toggle-btn',
 ) as HTMLButtonElement;
@@ -277,6 +284,12 @@ let sampleInputByType = createEmptyInputCounter();
 let dailyActiveSeconds = 0;
 let dailyInputByType = createEmptyInputCounter();
 let showDetailedMetrics = false;
+let lastInteractionAtMs = Date.now();
+let inactiveEmotionMode: Extract<MainEmotionMode, 'sleep' | 'neutral'> = 'neutral';
+let nextInactiveEmotionSwitchAt = 0;
+let activeEmotionFrameIndex: number | null = null;
+let activeEmotionMode: MainEmotionMode | null = null;
+let nextEmotionFrameSwitchAt = 0;
 let uiPanelVisible = loadUiPanelVisible();
 let uiPanelPosition: UiPanelPosition | null = loadUiPanelPosition();
 let pointerCaptureState: boolean | null = null;
@@ -289,6 +302,12 @@ const overlayBridge = window.overlayBridge;
 
 type CountedInputEvent = 'keydown' | 'mousedown' | 'mousemove' | 'wheel' | 'touchstart';
 type InputCounter = Record<CountedInputEvent, number>;
+
+function markUserInteraction(nowMs: number = Date.now()): void {
+  lastInteractionAtMs = nowMs;
+  inactiveEmotionMode = 'neutral';
+  nextInactiveEmotionSwitchAt = 0;
+}
 
 function createEmptyInputCounter(): InputCounter {
   return {
@@ -948,6 +967,73 @@ function getPetById(petId: string): PlaygroundPet | null {
   return playgroundPets.find((pet) => pet.id === petId) ?? null;
 }
 
+function pickDifferentRandomFrame(frames: number[], previousFrame: number | null): number {
+  if (frames.length <= 1) {
+    return frames[0] ?? 0;
+  }
+  const filtered = previousFrame === null ? frames : frames.filter((frame) => frame !== previousFrame);
+  const pool = filtered.length > 0 ? filtered : frames;
+  return pool[Math.floor(Math.random() * pool.length)] ?? pool[0] ?? 0;
+}
+
+function resolveMainEmotionMode(nowMs: number): MainEmotionMode {
+  if (state.stats.health <= 60) {
+    return 'tired';
+  }
+  if (state.stats.happiness >= 90) {
+    return 'happy';
+  }
+
+  const inactiveMs = nowMs - lastInteractionAtMs;
+  if (inactiveMs >= IDLE_INACTIVE_THRESHOLD_MS) {
+    if (nowMs >= nextInactiveEmotionSwitchAt) {
+      inactiveEmotionMode = Math.random() < 0.5 ? 'sleep' : 'neutral';
+      nextInactiveEmotionSwitchAt = nowMs + INACTIVE_IMAGE_SWITCH_MS;
+    }
+    return inactiveEmotionMode;
+  }
+
+  inactiveEmotionMode = 'neutral';
+  nextInactiveEmotionSwitchAt = 0;
+  return 'neutral';
+}
+
+function resolveMainEmotionFrameIndex(
+  profile: SpriteProfile,
+  motion: PetMotion,
+  runtimeFrames: number[],
+  nowMs: number,
+): number {
+  const emotionMode = resolveMainEmotionMode(nowMs);
+  const framePrefix = emotionMode;
+  const matchedFrames = runtimeFrames.filter((frameIndex) =>
+    (profile.frameEmotionIds[frameIndex] ?? '').startsWith(framePrefix),
+  );
+  const framePool = matchedFrames.length > 0 ? matchedFrames : runtimeFrames;
+  const switchMs = emotionMode === 'happy' ? HAPPY_IMAGE_SWITCH_MS : INACTIVE_IMAGE_SWITCH_MS;
+
+  if (activeEmotionMode !== emotionMode) {
+    activeEmotionMode = emotionMode;
+    activeEmotionFrameIndex = null;
+    nextEmotionFrameSwitchAt = 0;
+  }
+
+  if (
+    activeEmotionFrameIndex === null ||
+    !framePool.includes(activeEmotionFrameIndex) ||
+    nowMs >= nextEmotionFrameSwitchAt
+  ) {
+    activeEmotionFrameIndex = pickDifferentRandomFrame(framePool, activeEmotionFrameIndex);
+    nextEmotionFrameSwitchAt = nowMs + switchMs;
+  }
+
+  if (motion.state === 'drag') {
+    return framePool[0] ?? activeEmotionFrameIndex ?? 0;
+  }
+
+  return activeEmotionFrameIndex;
+}
+
 function resolveAnimationFrameIndex(pet: PlaygroundPet, motion: PetMotion, nowMs: number): number {
   const profile = getSpriteProfileForPet(pet);
   if (!profile) {
@@ -966,6 +1052,10 @@ function resolveAnimationFrameIndex(pet: PlaygroundPet, motion: PetMotion, nowMs
     return motion.expressionFrameIndex;
   }
 
+  if (pet.kind === 'main') {
+    return resolveMainEmotionFrameIndex(profile, motion, runtime.frames, nowMs);
+  }
+
   const effectiveFps =
     motion.state === 'walk'
       ? Math.min(16, Math.max(runtime.fps, runtime.fps + Math.abs(motion.vx) / 35))
@@ -980,6 +1070,10 @@ function resolveAnimationFrameIndex(pet: PlaygroundPet, motion: PetMotion, nowMs
 }
 
 function updateIdleExpressionFrame(pet: PlaygroundPet, motion: PetMotion, nowMs: number): void {
+  if (pet.kind === 'main') {
+    motion.expressionFrameIndex = null;
+    return;
+  }
   const profile = getSpriteProfileForPet(pet);
   if (!profile) {
     motion.expressionFrameIndex = null;
@@ -1437,6 +1531,7 @@ function stepPetMotion(deltaSec: number, nowMs: number): void {
     }
     applyPetNodeVisual(node, pet, nowMs);
   }
+  updatePanelFace(nowMs);
 }
 
 function startLiveLoop(): void {
@@ -1501,6 +1596,7 @@ function renderPlayground(): void {
       }
 
       event.preventDefault();
+      markUserInteraction();
       beginDragLock();
       motion.dragging = true;
       transitionMotionState(motion, 'drag', performance.now());
@@ -1780,9 +1876,35 @@ function getStageExpProgress(exp: number, stage: Stage): { current: number; next
   return { current, next, ratio };
 }
 
+function updatePanelFace(nowMs: number): void {
+  const mainPet = playgroundPets.find((pet) => pet.kind === 'main');
+  if (!mainPet) {
+    faceElement.style.backgroundImage = '';
+    faceElement.textContent = STAGE_FACE_MAP[state.stage];
+    return;
+  }
+  const motion = ensurePetMotion(mainPet.id);
+  const profile = getSpriteProfileForPet(mainPet);
+  if (!profile) {
+    faceElement.style.backgroundImage = '';
+    faceElement.textContent = STAGE_FACE_MAP[state.stage];
+    return;
+  }
+
+  const frameIndex = resolveAnimationFrameIndex(mainPet, motion, nowMs);
+  const imageUrl = profile.imageUrls[frameIndex] ?? profile.imageUrls[0] ?? '';
+  if (imageUrl) {
+    faceElement.textContent = '';
+    faceElement.style.backgroundImage = `url("${imageUrl}")`;
+  } else {
+    faceElement.style.backgroundImage = '';
+    faceElement.textContent = STAGE_FACE_MAP[state.stage];
+  }
+}
+
 function render(nextState: PetState): void {
   state = nextState;
-  faceElement.textContent = STAGE_FACE_MAP[state.stage];
+  updatePanelFace(performance.now());
   stageTextElement.textContent = `Stage: ${state.stage}`;
   warningTextElement.textContent = state.warnings.join(' · ');
 
@@ -1812,6 +1934,7 @@ function handleAction(action: 'feed' | 'clean' | 'play'): void {
     overlayHintElement.textContent = '현재 상태에서는 해당 액션으로 얻을 수 있는 보상이 없습니다.';
     return;
   }
+  markUserInteraction();
   render(applyAction(state, action));
 }
 
@@ -1897,6 +2020,7 @@ function bindActivitySignalEvents(): void {
   const countedEvents: CountedInputEvent[] = ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchstart'];
   for (const eventName of countedEvents) {
     window.addEventListener(eventName, () => {
+      markUserInteraction();
       if (activitySnapshot.enabled) {
         sampleInputEvents += 1;
         sampleInputByType[eventName] += 1;
@@ -1985,6 +2109,28 @@ mainMotionModeSelect.addEventListener('change', () => {
   applyMainMotionMode(mode);
 });
 
+resetGrowthButton.addEventListener('click', () => {
+  const confirmed = window.confirm(
+    '지금까지의 성장 내용(스탯, EXP, 활동 EXP 기록)을 모두 초기화합니다. 계속하시겠습니까?',
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  window.localStorage.removeItem(SAVE_STORAGE_KEY);
+  window.localStorage.removeItem(ACTIVITY_STORAGE_KEY);
+  state = loadState();
+  activitySnapshot = loadActivitySnapshot(new Date());
+  sampleActiveSeconds = 0;
+  sampleInputEvents = 0;
+  sampleInputByType = createEmptyInputCounter();
+  dailyActiveSeconds = 0;
+  dailyInputByType = createEmptyInputCounter();
+  markUserInteraction();
+  overlayHintElement.textContent = '성장 내용을 초기화했습니다.';
+  render(state);
+});
+
 displayApplyButton.addEventListener('click', async () => {
   if (!overlayBridge) {
     return;
@@ -2039,6 +2185,7 @@ activityOptToggleButton.addEventListener('click', () => {
 });
 
 activityCheckinButton.addEventListener('click', () => {
+  markUserInteraction();
   const result = grantFallbackExp(activitySnapshot, new Date());
   activitySnapshot = result.snapshot;
   persistActivitySnapshot(activitySnapshot);
