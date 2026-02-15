@@ -47,13 +47,7 @@ const DEFAULT_PREFERENCES: OverlayPreferences = {
 
 const CLICK_THROUGH_TOGGLE_SHORTCUT = 'CommandOrControl+Alt+Shift+O';
 const CLICK_THROUGH_SHORTCUT_LABEL = 'Ctrl+Alt+Shift+O';
-const WINDOW_WIDTH = 520;
-const WINDOW_HEIGHT = 320;
-const WINDOW_MIN_WIDTH = 420;
-const WINDOW_MIN_HEIGHT = 280;
 const APP_USER_MODEL_ID = 'com.jinhy.desktoppetoverlay';
-const WINDOW_EDGE_MARGIN_X = 24;
-const WINDOW_EDGE_MARGIN_Y = 12;
 
 let mainWindow: BrowserWindow | null = null;
 let overlayPreferences: OverlayPreferences = { ...DEFAULT_PREFERENCES };
@@ -197,11 +191,8 @@ const clampWindowPosition = (): void => {
   const x = overlayPreferences.x as number;
   const y = overlayPreferences.y as number;
   const display = screen.getDisplayNearestPoint({ x, y });
-  const { x: workX, y: workY, width: workWidth, height: workHeight } = display.workArea;
-  const maxX = Math.max(workX, workX + workWidth - WINDOW_WIDTH);
-  const maxY = Math.max(workY, workY + workHeight - WINDOW_HEIGHT);
-  const nextX = Math.min(Math.max(x, workX), maxX);
-  const nextY = Math.min(Math.max(y, workY), maxY);
+  const nextX = display.workArea.x;
+  const nextY = display.workArea.y;
 
   if (nextX !== x || nextY !== y) {
     overlayPreferences.x = nextX;
@@ -210,33 +201,23 @@ const clampWindowPosition = (): void => {
   }
 };
 
-const clampBoundsToWorkArea = (
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-): { x: number; y: number } => {
-  const centerPoint = {
-    x: Math.round(x + width / 2),
-    y: Math.round(y + height / 2),
-  };
-  const display = screen.getDisplayNearestPoint(centerPoint);
-  const { x: workX, y: workY, width: workWidth, height: workHeight } = display.workArea;
-  const maxX = Math.max(workX, workX + workWidth - width);
-  const maxY = Math.max(workY, workY + workHeight - height);
+const getDefaultWindowPosition = (): { x: number; y: number } => {
+  const display = screen.getPrimaryDisplay();
+  const { x, y } = display.workArea;
   return {
-    x: Math.min(Math.max(x, workX), maxX),
-    y: Math.min(Math.max(y, workY), maxY),
+    x,
+    y,
   };
 };
 
-const getDefaultWindowPosition = (): { x: number; y: number } => {
-  const display = screen.getPrimaryDisplay();
-  const { x, y, width, height } = display.workArea;
-  return {
-    x: Math.round(x + width - WINDOW_WIDTH - WINDOW_EDGE_MARGIN_X),
-    y: Math.round(y + height - WINDOW_HEIGHT - WINDOW_EDGE_MARGIN_Y),
-  };
+const getLaunchDisplay = (): Electron.Display => {
+  if (Number.isFinite(overlayPreferences.x) && Number.isFinite(overlayPreferences.y)) {
+    return screen.getDisplayNearestPoint({
+      x: Math.round(overlayPreferences.x as number),
+      y: Math.round(overlayPreferences.y as number),
+    });
+  }
+  return screen.getPrimaryDisplay();
 };
 
 const resolveWindowIconPath = (): string => {
@@ -255,12 +236,12 @@ const resolveWindowIconPath = (): string => {
 
 const createWindow = () => {
   const defaultPosition = getDefaultWindowPosition();
+  const launchDisplay = getLaunchDisplay();
+  const launchArea = launchDisplay.workArea;
   const iconPath = resolveWindowIconPath();
   mainWindow = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
-    minWidth: WINDOW_MIN_WIDTH,
-    minHeight: WINDOW_MIN_HEIGHT,
+    width: launchArea.width,
+    height: launchArea.height,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -270,9 +251,26 @@ const createWindow = () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
-    x: overlayPreferences.x ?? defaultPosition.x,
-    y: overlayPreferences.y ?? defaultPosition.y,
+    x: Number.isFinite(overlayPreferences.x) ? (overlayPreferences.x as number) : defaultPosition.x,
+    y: Number.isFinite(overlayPreferences.y) ? (overlayPreferences.y as number) : defaultPosition.y,
   });
+
+  if (
+    mainWindow.getBounds().width !== launchArea.width ||
+    mainWindow.getBounds().height !== launchArea.height ||
+    mainWindow.getBounds().x !== launchArea.x ||
+    mainWindow.getBounds().y !== launchArea.y
+  ) {
+    mainWindow.setBounds({
+      x: launchArea.x,
+      y: launchArea.y,
+      width: launchArea.width,
+      height: launchArea.height,
+    });
+  }
+  overlayPreferences.x = launchArea.x;
+  overlayPreferences.y = launchArea.y;
+  writeOverlayPreferences();
 
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -314,81 +312,10 @@ const registerIpcHandlers = (): void => {
       return;
     }
 
-    const payload: WindowMovePayload =
+    // Backward compatibility: keep handler alive, but no-op.
+    const _payload: WindowMovePayload =
       rawPayload && typeof rawPayload === 'object' ? (rawPayload as WindowMovePayload) : {};
-
-    const deltaX = Number.isFinite(payload.deltaX) ? Math.round(Number(payload.deltaX)) : 0;
-    const deltaY = Number.isFinite(payload.deltaY) ? Math.round(Number(payload.deltaY)) : 0;
-    if (deltaX === 0 && deltaY === 0) {
-      return;
-    }
-
-    const currentBounds = mainWindow.getBounds();
-    let nextX = currentBounds.x + deltaX;
-    let nextY = currentBounds.y + deltaY;
-    const hasAnchor =
-      Number.isFinite(payload.anchorX) &&
-      Number.isFinite(payload.anchorY) &&
-      Number.isFinite(payload.anchorSize);
-    const anchorX = hasAnchor ? Math.round(Number(payload.anchorX)) : 0;
-    const anchorY = hasAnchor ? Math.round(Number(payload.anchorY)) : 0;
-    const anchorSize = hasAnchor
-      ? Math.max(16, Math.min(256, Math.round(Number(payload.anchorSize))))
-      : 44;
-    const lockToTaskbar = payload.lockToTaskbar === true;
-    const safeAnchorY = Math.max(0, Math.min(anchorY, Math.max(0, currentBounds.height - anchorSize)));
-
-    const displayPoint = hasAnchor
-      ? {
-          x: Math.round(nextX + anchorX + anchorSize / 2),
-          y: Math.round(nextY + anchorY + anchorSize / 2),
-        }
-      : {
-          x: Math.round(nextX + currentBounds.width / 2),
-          y: Math.round(nextY + currentBounds.height / 2),
-        };
-    const display = screen.getDisplayNearestPoint(displayPoint);
-    const { x: workX, y: workY, width: workWidth, height: workHeight } = display.workArea;
-
-    if (hasAnchor) {
-      if (lockToTaskbar) {
-        const displays = screen.getAllDisplays();
-        let globalMinX = Number.POSITIVE_INFINITY;
-        let globalMaxX = Number.NEGATIVE_INFINITY;
-        for (const item of displays) {
-          const area = item.workArea;
-          globalMinX = Math.min(globalMinX, area.x - anchorX);
-          globalMaxX = Math.max(globalMaxX, area.x + area.width - anchorX - anchorSize);
-        }
-
-        if (Number.isFinite(globalMinX) && Number.isFinite(globalMaxX)) {
-          nextX = Math.min(Math.max(nextX, globalMinX), globalMaxX);
-        }
-
-        const targetDisplay = screen.getDisplayNearestPoint({
-          x: Math.round(nextX + anchorX + anchorSize / 2),
-          y: Math.round(displayPoint.y),
-        });
-        const area = targetDisplay.workArea;
-        nextY = area.y + area.height - anchorSize - WINDOW_EDGE_MARGIN_Y - safeAnchorY;
-      } else {
-        const minX = workX - anchorX;
-        const maxX = workX + workWidth - anchorX - anchorSize;
-        nextX = Math.min(Math.max(nextX, minX), maxX);
-        const minY = workY - anchorY;
-        const maxY = workY + workHeight - anchorY - anchorSize;
-        nextY = Math.min(Math.max(nextY, minY), maxY);
-      }
-    } else {
-      const next = clampBoundsToWorkArea(nextX, nextY, currentBounds.width, currentBounds.height);
-      nextX = next.x;
-      nextY = next.y;
-    }
-
-    mainWindow.setPosition(nextX, nextY);
-    overlayPreferences.x = nextX;
-    overlayPreferences.y = nextY;
-    writeOverlayPreferences();
+    void _payload;
   });
 
   ipcMain.handle('overlay:get-displays', () => getDisplayInfos());
@@ -409,11 +336,14 @@ const registerIpcHandlers = (): void => {
     }
 
     const area = target.workArea;
-    const nextX = Math.round(area.x + area.width - WINDOW_WIDTH - WINDOW_EDGE_MARGIN_X);
-    const nextY = Math.round(area.y + area.height - WINDOW_HEIGHT - WINDOW_EDGE_MARGIN_Y);
-    mainWindow.setPosition(nextX, nextY);
-    overlayPreferences.x = nextX;
-    overlayPreferences.y = nextY;
+    mainWindow.setBounds({
+      x: area.x,
+      y: area.y,
+      width: area.width,
+      height: area.height,
+    });
+    overlayPreferences.x = area.x;
+    overlayPreferences.y = area.y;
     writeOverlayPreferences();
     return true;
   });

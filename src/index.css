@@ -125,6 +125,7 @@ h1 {
 
 .overlay-row-character {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  display: none;
 }
 
 .overlay-status {

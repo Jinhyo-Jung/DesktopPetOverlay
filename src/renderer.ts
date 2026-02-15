@@ -95,8 +95,8 @@ const UI_PANEL_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-visible-v1';
 const UI_PANEL_POSITION_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-position-v1';
 const DRAG_THRESHOLD = 4;
 const PET_NODE_SIZE = 88;
-const MAIN_DEFAULT_X = 412;
-const MAIN_DEFAULT_Y = 220;
+const MAIN_DEFAULT_MARGIN_X = 48;
+const MAIN_DEFAULT_MARGIN_Y = 32;
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 
@@ -184,6 +184,7 @@ let showDetailedMetrics = false;
 let uiPanelVisible = loadUiPanelVisible();
 let uiPanelPosition: UiPanelPosition | null = loadUiPanelPosition();
 let pointerCaptureState: boolean | null = null;
+let dragLockCount = 0;
 
 const overlayBridge = window.overlayBridge;
 
@@ -328,7 +329,17 @@ function shouldCapturePointerAt(clientX: number, clientY: number): boolean {
   return Boolean(target.closest('.playground-pet'));
 }
 
-function syncPointerCaptureMode(pointerEvent?: PointerEvent): void {
+function beginDragLock(): void {
+  dragLockCount += 1;
+  void applyPointerCapture(true);
+}
+
+function endDragLock(): void {
+  dragLockCount = Math.max(0, dragLockCount - 1);
+  syncPointerCaptureMode();
+}
+
+function syncPointerCaptureMode(mouseEvent?: MouseEvent): void {
   if (!overlayBridge) {
     return;
   }
@@ -338,16 +349,21 @@ function syncPointerCaptureMode(pointerEvent?: PointerEvent): void {
     return;
   }
 
-  if (!pointerEvent) {
+  if (dragLockCount > 0) {
+    void applyPointerCapture(true);
+    return;
+  }
+
+  if (!mouseEvent) {
     const hoveredSelector = uiPanelVisible
       ? '#pet-ui-panel:hover, .playground-pet:hover'
       : '.playground-pet:hover';
     const hovered = document.querySelector(hoveredSelector);
-    void applyPointerCapture(Boolean(hovered) || uiPanelVisible);
+    void applyPointerCapture(Boolean(hovered));
     return;
   }
 
-  void applyPointerCapture(shouldCapturePointerAt(pointerEvent.clientX, pointerEvent.clientY));
+  void applyPointerCapture(shouldCapturePointerAt(mouseEvent.clientX, mouseEvent.clientY));
 }
 
 function formatDuration(seconds: number): string {
@@ -363,15 +379,23 @@ function updateActionButtons(nextState: PetState): void {
   playButton.disabled = !isActionEffective(nextState, 'play');
 }
 
+function getDefaultMainPetPosition(): { x: number; y: number } {
+  return {
+    x: Math.max(8, window.innerWidth - PET_NODE_SIZE - MAIN_DEFAULT_MARGIN_X),
+    y: Math.max(8, window.innerHeight - PET_NODE_SIZE - MAIN_DEFAULT_MARGIN_Y),
+  };
+}
+
 function loadPlaygroundPets(): PlaygroundPet[] {
   try {
+    const defaultMain = getDefaultMainPetPosition();
     const raw = window.localStorage.getItem(CHARACTER_STORAGE_KEY);
     if (!raw) {
-      return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: MAIN_DEFAULT_X, y: MAIN_DEFAULT_Y }];
+      return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: defaultMain.x, y: defaultMain.y }];
     }
 
     const parsed = JSON.parse(raw) as PlaygroundPet[];
-    let sanitized = parsed
+    const sanitized = parsed
       .filter((pet) => pet && typeof pet.id === 'string' && pet.id.length > 0)
       .map((pet) => ({
         id: pet.id,
@@ -387,17 +411,14 @@ function loadPlaygroundPets(): PlaygroundPet[] {
         id: 'main',
         kind: 'main',
         emoji: STAGE_FACE_MAP[state.stage],
-        x: MAIN_DEFAULT_X,
-        y: MAIN_DEFAULT_Y,
+        x: defaultMain.x,
+        y: defaultMain.y,
       });
-    } else if (mainPet.y < 80) {
-      sanitized = sanitized.map((pet) =>
-        pet.kind === 'main' ? { ...pet, y: MAIN_DEFAULT_Y } : pet,
-      );
     }
     return sanitized;
   } catch {
-    return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: MAIN_DEFAULT_X, y: MAIN_DEFAULT_Y }];
+    const defaultMain = getDefaultMainPetPosition();
+    return [{ id: 'main', kind: 'main', emoji: STAGE_FACE_MAP[state.stage], x: defaultMain.x, y: defaultMain.y }];
   }
 }
 
@@ -442,13 +463,18 @@ function renderPlayground(): void {
       }
 
       event.preventDefault();
+      beginDragLock();
+      if (node.setPointerCapture) {
+        try {
+          node.setPointerCapture(event.pointerId);
+        } catch {
+          // noop
+        }
+      }
       const startX = event.clientX;
       const startY = event.clientY;
       const originX = pet.x;
       const originY = pet.y;
-      let previousX = startX;
-      let previousY = startY;
-      const useWindowDrag = pet.kind === 'main' && !uiPanelVisible && Boolean(overlayBridge);
       let moved = false;
       node.classList.add('dragging');
 
@@ -457,24 +483,6 @@ function renderPlayground(): void {
         const deltaY = moveEvent.clientY - startY;
         if (Math.abs(deltaX) >= DRAG_THRESHOLD || Math.abs(deltaY) >= DRAG_THRESHOLD) {
           moved = true;
-        }
-
-        if (useWindowDrag) {
-          const stepX = moveEvent.clientX - previousX;
-          const stepY = moveEvent.clientY - previousY;
-          previousX = moveEvent.clientX;
-          previousY = moveEvent.clientY;
-          if (stepX !== 0 || stepY !== 0) {
-            void overlayBridge?.moveWindowBy({
-              deltaX: stepX,
-              deltaY: stepY,
-              anchorX: pet.x,
-              anchorY: pet.y,
-              anchorSize: PET_NODE_SIZE,
-              lockToTaskbar: true,
-            });
-          }
-          return;
         }
 
         const nextX = originX + deltaX;
@@ -489,6 +497,7 @@ function renderPlayground(): void {
 
       const onPointerUp = (): void => {
         window.removeEventListener('pointermove', onPointerMove);
+        endDragLock();
         node.classList.remove('dragging');
         if (!moved) {
           selectedPetId = pet.id;
@@ -501,9 +510,7 @@ function renderPlayground(): void {
             overlayHintElement.textContent = '캐릭터 선택 완료';
           }
         } else {
-          overlayHintElement.textContent = useWindowDrag
-            ? '창 위치 이동 완료'
-            : '드래그 위치 저장 완료';
+          overlayHintElement.textContent = '드래그 위치 저장 완료';
         }
         persistPlaygroundPets();
         renderPlayground();
@@ -511,6 +518,7 @@ function renderPlayground(): void {
 
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp, { once: true });
+      window.addEventListener('pointercancel', onPointerUp, { once: true });
     });
 
     playgroundElement.appendChild(node);
@@ -595,8 +603,8 @@ function updateActivityUI(): void {
 function updateHelpPanel(): void {
   helpPanelElement.textContent =
     `- 메인 캐릭터 클릭: 설정 UI를 열고/닫습니다.\n` +
-    `- 메인 캐릭터 드래그(컴팩트 화면): 캐릭터 기준으로 작업표시줄 위를 따라 이동합니다.\n` +
-    `- 스탯 패널 상단 '패널 이동' 드래그: 패널만 이동하며 캐릭터 위치는 유지됩니다.\n` +
+    `- 메인 캐릭터 드래그(컴팩트 화면): 현재 모니터 작업영역 안에서 자유롭게 이동합니다.\n` +
+    `- 스탯 패널 상단 '패널 이동' 드래그: 모니터 해상도 범위 안에서 패널만 이동합니다.\n` +
     `- ⚙ 설정: 표시할 모니터를 선택해 캐릭터 위치를 전환합니다.\n` +
     `- ESC: 열린 설정 UI를 닫습니다.\n` +
     `- Feed / Clean / Play: 해당 능력치가 실제로 회복될 때만 EXP를 줍니다.\n` +
@@ -739,6 +747,8 @@ function bindActivitySignalEvents(): void {
 feedButton.addEventListener('click', () => handleAction('feed'));
 cleanButton.addEventListener('click', () => handleAction('clean'));
 playButton.addEventListener('click', () => handleAction('play'));
+addCharacterButton.disabled = true;
+removeCharacterButton.disabled = true;
 addCharacterButton.addEventListener('click', addBuddy);
 removeCharacterButton.addEventListener('click', removeBuddy);
 
@@ -748,6 +758,14 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
   }
 
   event.preventDefault();
+  beginDragLock();
+  if (panelDragHandleElement.setPointerCapture) {
+    try {
+      panelDragHandleElement.setPointerCapture(event.pointerId);
+    } catch {
+      // noop
+    }
+  }
   const startX = event.clientX;
   const startY = event.clientY;
   const origin = clampUiPanelPosition(uiPanelPosition ?? getDefaultUiPanelPosition());
@@ -769,6 +787,7 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
 
   const onPointerUp = (): void => {
     window.removeEventListener('pointermove', onPointerMove);
+    endDragLock();
     if (moved) {
       persistUiPanelPosition();
       overlayHintElement.textContent = '스탯 패널 위치 이동 완료';
@@ -777,6 +796,7 @@ panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => 
 
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp, { once: true });
+  window.addEventListener('pointercancel', onPointerUp, { once: true });
 });
 
 settingsButton.addEventListener('click', async () => {
@@ -917,16 +937,16 @@ helpButton.addEventListener('click', () => {
   helpPanelElement.classList.toggle('hidden');
 });
 
-window.addEventListener('pointermove', (event: PointerEvent) => {
+window.addEventListener('mousemove', (event: MouseEvent) => {
   syncPointerCaptureMode(event);
 });
 
-window.addEventListener('pointerenter', (event: PointerEvent) => {
+window.addEventListener('mouseenter', (event: MouseEvent) => {
   syncPointerCaptureMode(event);
 });
 
-window.addEventListener('pointerleave', () => {
-  if (!uiPanelVisible && !clickThroughEnabled) {
+window.addEventListener('mouseleave', () => {
+  if (!clickThroughEnabled && dragLockCount === 0) {
     void applyPointerCapture(false);
   }
 });
