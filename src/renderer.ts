@@ -114,6 +114,8 @@ const PET_SPRITE_CONFIG_CANDIDATES = [
   './source/pet_sprites/main_cat.json',
   '../source/pet_sprites/main_cat.json',
   '../../source/pet_sprites/main_cat.json',
+  '../../../source/pet_sprites/main_cat.json',
+  '../../../../source/pet_sprites/main_cat.json',
 ];
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
@@ -517,6 +519,8 @@ async function resolveSpriteImageUrl(config: PetSpriteConfig): Promise<string | 
     `./${config.image}`,
     `../${config.image}`,
     `../../${config.image}`,
+    `../../../${config.image}`,
+    `../../../../${config.image}`,
   ];
   for (const candidate of candidates) {
     try {
@@ -911,6 +915,7 @@ function isPetOpaqueAt(node: HTMLElement, clientX: number, clientY: number): boo
 
 function applyPetNodeVisual(node: HTMLButtonElement, pet: PlaygroundPet, nowMs: number = performance.now()): void {
   const motion = ensurePetMotion(pet.id);
+  const profile = getSpriteProfileForPet(pet);
   const petSize = getCurrentPetSize();
   node.classList.toggle('selected', pet.id === selectedPetId);
   node.classList.toggle('state-idle', motion.state === 'idle');
@@ -923,6 +928,9 @@ function applyPetNodeVisual(node: HTMLButtonElement, pet: PlaygroundPet, nowMs: 
   node.style.left = `${pet.x}px`;
   node.style.top = `${pet.y}px`;
   node.style.setProperty('--pet-facing', motion.facing < 0 ? '-1' : '1');
+  if (!profile) {
+    node.style.fontSize = `${Math.max(28, Math.round(petSize * 0.56))}px`;
+  }
 
   const canvas = node.querySelector('canvas.pet-sprite-canvas') as HTMLCanvasElement | null;
   if (canvas && (canvas.width !== petSize || canvas.height !== petSize)) {
@@ -1298,6 +1306,7 @@ function renderPlayground(): void {
       node.appendChild(shell);
     } else {
       node.textContent = pet.emoji;
+      node.style.fontSize = `${Math.max(28, Math.round(petSize * 0.56))}px`;
     }
     applyPetNodeVisual(node, pet);
 
