@@ -1,5 +1,12 @@
 # CHANGE_LOG
 
+## 2026-02-15T14:38:43+09:00
+- 루트 설정 파일 정리를 위해 Forge/Vite/TypeScript/CMake 실제 설정 본문을 `code/`로 이동했다. `code/config/forge.config.ts`, `code/config/vite.*.config.ts`, `code/tsconfig.json`, `code/CMakeLists.txt`를 기준으로 관리하도록 재배치했다.
+- Electron Forge가 루트 `forge.config.ts` 자동 탐색을 사용하므로, 루트에는 `code/config/forge.config.ts`를 재export하는 얇은 래퍼만 남겼다.
+- 루트 CMake도 동일하게 빌드 진입점만 유지하도록 최소 부트스트랩(`add_subdirectory(code)`)으로 축소하고, 실제 타깃 정의는 `code/CMakeLists.txt`로 이동했다.
+- `code/CMakeLists.txt` 내부 소스 경로를 새 기준(`src/*`)으로 보정하고, 에셋 복사 경로를 `code` 하위 실행에도 동작하도록 `CMAKE_CURRENT_SOURCE_DIR` 기반으로 수정했다.
+- 8프레임 생성 명령(`sprite:gen8`) 동작 검증을 위해 `source/pet_sprites/main_cat_8.generated.json`을 생성해 프레임 8개 출력이 저장되는 것을 확인했다. 다만 메인 캐릭터 적용 파일(`source/pet_sprites/main_cat.json`)은 현재 4프레임 상태로 유지했다.
+
 ## 2026-02-15T14:30:25+09:00
 - `DesktopPetOverlay.exe` 실행 시 캐릭터가 전혀 보이지 않던 치명 버그를 수정했다. 원인은 `code/src/renderer.ts` 모듈 초기화 시점에 `loadPlaygroundPets()`가 먼저 실행되며 `getSpriteProfileForPet()`를 호출했는데, 내부에서 참조하는 `spriteProfileMap`이 아직 초기화되지 않아 `ReferenceError(Cannot access 'Re' before initialization)`가 발생하던 순서 문제(TDZ)였다.
 - 선언 순서를 조정해 `defaultMainSpriteProfile`, `spriteProfileMap`, `petFrameIndexMap`을 `loadPlaygroundPets()` 호출보다 먼저 초기화하도록 변경했고, 패키징 exe 로그에서 해당 예외가 사라진 것을 확인했다.
