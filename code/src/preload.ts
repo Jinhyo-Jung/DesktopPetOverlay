@@ -40,14 +40,19 @@ interface OverlayBridge {
   requestClose: () => Promise<boolean>;
   confirmClose: () => Promise<boolean>;
   onCloseRequested: (callback: () => void) => () => void;
-  getOpenAiStatus: () => Promise<{ hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string }>;
-  setOpenAiConfig: (payload: { apiKey: string; model?: string }) => Promise<{
+  getOpenAiStatus: () => Promise<{
+    hasApiKey: boolean;
+    source: 'config' | 'none';
+    model: string;
+    configPath: string;
+  }>;
+  setOpenAiConfig: (payload: { apiKey: string }) => Promise<{
     ok: boolean;
-    status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+    status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
   }>;
   clearOpenAiConfig: () => Promise<{
     ok: boolean;
-    status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+    status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
   }>;
 }
 
@@ -92,18 +97,19 @@ const overlayBridge: OverlayBridge = {
   },
   getOpenAiStatus: () => ipcRenderer.invoke('openai:get-status') as Promise<{
     hasApiKey: boolean;
-    source: 'config' | 'env' | 'none';
+    source: 'config' | 'none';
     model: string;
+    configPath: string;
   }>,
-  setOpenAiConfig: (payload: { apiKey: string; model?: string }) =>
+  setOpenAiConfig: (payload: { apiKey: string }) =>
     ipcRenderer.invoke('openai:set-config', payload) as Promise<{
       ok: boolean;
-      status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+      status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
     }>,
   clearOpenAiConfig: () =>
     ipcRenderer.invoke('openai:clear-config') as Promise<{
       ok: boolean;
-      status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+      status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
     }>,
 };
 

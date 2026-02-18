@@ -53,14 +53,19 @@ interface OverlayBridge {
   requestClose: () => Promise<boolean>;
   confirmClose: () => Promise<boolean>;
   onCloseRequested: (callback: () => void) => () => void;
-  getOpenAiStatus: () => Promise<{ hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string }>;
-  setOpenAiConfig: (payload: { apiKey: string; model?: string }) => Promise<{
+  getOpenAiStatus: () => Promise<{
+    hasApiKey: boolean;
+    source: 'config' | 'none';
+    model: string;
+    configPath: string;
+  }>;
+  setOpenAiConfig: (payload: { apiKey: string }) => Promise<{
     ok: boolean;
-    status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+    status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
   }>;
   clearOpenAiConfig: () => Promise<{
     ok: boolean;
-    status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+    status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
   }>;
 }
 
@@ -325,9 +330,9 @@ const openAiKeyToggleButton = document.getElementById('openai-key-toggle-btn') a
 const openAiKeyStatusElement = document.getElementById('openai-key-status') as HTMLElement;
 const openAiKeyPanelElement = document.getElementById('openai-key-panel') as HTMLElement;
 const openAiApiKeyInputElement = document.getElementById('openai-api-key-input') as HTMLInputElement;
-const openAiModelInputElement = document.getElementById('openai-model-input') as HTMLInputElement;
 const openAiKeySaveButton = document.getElementById('openai-key-save-btn') as HTMLButtonElement;
 const openAiKeyClearButton = document.getElementById('openai-key-clear-btn') as HTMLButtonElement;
+const openAiKeyHelpElement = document.getElementById('openai-key-help') as HTMLElement;
 
 let state: PetState = loadState();
 let clickThroughEnabled = false;
@@ -369,12 +374,14 @@ let chatClosedByTurnLimit = false;
 let chatSessionMaxTurns = 0;
 let chatSessionUsedTurns = 0;
 let chatMessages: ChatMessage[] = [];
-let openAiStatus: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string } = {
+let openAiStatus: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string } = {
   hasApiKey: false,
   source: 'none',
   model: 'gpt-4o-mini',
+  configPath: '',
 };
 let openAiKeyPanelVisible = false;
+let openAiKeySetupUnlocked = false;
 let closeHandled = false;
 
 const overlayBridge = window.overlayBridge;
@@ -562,8 +569,8 @@ function updateChatUI(): void {
   if (!chatVisible) {
     chatBoxElement.classList.add('hidden');
     if (!openAiStatus.hasApiKey) {
-      chatOpenButton.disabled = true;
-      chatStatusElement.textContent = 'API 키가 필요합니다. (API 키 설정을 눌러 등록)';
+      chatOpenButton.disabled = false;
+      chatStatusElement.textContent = 'API 키가 필요합니다. (대화하기를 누른 뒤 API 키 설정에서 등록)';
       chatSendButton.disabled = true;
       chatInputElement.disabled = true;
       return;
@@ -593,17 +600,22 @@ function updateChatUI(): void {
 
 function updateOpenAiKeyUI(): void {
   openAiKeyPanelElement.classList.toggle('hidden', !openAiKeyPanelVisible);
-  const sourceLabel =
-    openAiStatus.source === 'config' ? '앱 저장' : openAiStatus.source === 'env' ? '환경변수' : '없음';
+  const sourceLabel = openAiStatus.source === 'config' ? '앱 저장' : '없음';
   openAiKeyStatusElement.textContent = openAiStatus.hasApiKey
     ? `설정됨 (${sourceLabel}) · model ${openAiStatus.model}`
     : '미설정 · 대화 기능을 사용하려면 키가 필요합니다.';
   openAiKeyClearButton.disabled = openAiStatus.source !== 'config';
+  openAiKeyToggleButton.disabled = !openAiKeySetupUnlocked;
+  if (openAiKeyHelpElement) {
+    openAiKeyHelpElement.textContent = openAiStatus.configPath
+      ? `키 저장 경로: ${openAiStatus.configPath}`
+      : '키 저장 경로 확인 중...';
+  }
 }
 
 async function refreshOpenAiStatus(): Promise<void> {
   if (!overlayBridge) {
-    openAiStatus = { hasApiKey: false, source: 'none', model: 'gpt-4o-mini' };
+    openAiStatus = { hasApiKey: false, source: 'none', model: 'gpt-4o-mini', configPath: '' };
     updateOpenAiKeyUI();
     updateChatUI();
     return;
@@ -611,7 +623,7 @@ async function refreshOpenAiStatus(): Promise<void> {
   try {
     openAiStatus = await overlayBridge.getOpenAiStatus();
   } catch {
-    openAiStatus = { hasApiKey: false, source: 'none', model: 'gpt-4o-mini' };
+    openAiStatus = { hasApiKey: false, source: 'none', model: 'gpt-4o-mini', configPath: '' };
   }
   updateOpenAiKeyUI();
   updateChatUI();
@@ -629,6 +641,7 @@ function openChatSession(): void {
     updateChatUI();
     return;
   }
+  openAiKeySetupUnlocked = true;
   if (!openAiStatus.hasApiKey) {
     openAiKeyPanelVisible = true;
     updateOpenAiKeyUI();
@@ -2797,15 +2810,13 @@ openAiKeySaveButton.addEventListener('click', async () => {
     return;
   }
   const apiKey = openAiApiKeyInputElement.value.trim();
-  const model = openAiModelInputElement.value.trim();
   if (!apiKey) {
     overlayHintElement.textContent = 'API 키를 입력해주세요.';
     return;
   }
-  const result = await overlayBridge.setOpenAiConfig({ apiKey, model: model || undefined });
+  const result = await overlayBridge.setOpenAiConfig({ apiKey });
   if (result.ok) {
     openAiApiKeyInputElement.value = '';
-    openAiModelInputElement.value = '';
     openAiStatus = result.status;
     openAiKeyPanelVisible = false;
     updateOpenAiKeyUI();

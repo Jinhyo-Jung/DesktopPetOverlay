@@ -52,8 +52,9 @@ interface OpenAiConfig {
 
 interface OpenAiStatus {
   hasApiKey: boolean;
-  source: 'config' | 'env' | 'none';
+  source: 'config' | 'none';
   model: string;
+  configPath: string;
 }
 
 interface CloseFlowState {
@@ -117,27 +118,15 @@ const clearOpenAiConfig = (): boolean => {
   }
 };
 
-const resolveOpenAiAuth = (): { apiKey: string | null; source: 'config' | 'env' | 'none' } => {
+const resolveOpenAiAuth = (): { apiKey: string | null; source: 'config' | 'none' } => {
   const configKey = readOpenAiConfig().apiKey?.trim();
   if (configKey) {
     return { apiKey: configKey, source: 'config' };
-  }
-  const envKey = process.env.OPENAI_API_KEY?.trim();
-  if (envKey) {
-    return { apiKey: envKey, source: 'env' };
   }
   return { apiKey: null, source: 'none' };
 };
 
 const resolveOpenAiModel = (): string => {
-  const configModel = readOpenAiConfig().model?.trim();
-  if (configModel) {
-    return configModel;
-  }
-  const envModel = process.env.OPENAI_MODEL?.trim();
-  if (envModel) {
-    return envModel;
-  }
   return DEFAULT_OPENAI_MODEL;
 };
 
@@ -147,6 +136,7 @@ const getOpenAiStatus = (): OpenAiStatus => {
     hasApiKey: Boolean(resolved.apiKey),
     source: resolved.source,
     model: resolveOpenAiModel(),
+    configPath: getOpenAiConfigPath(),
   };
 };
 
@@ -517,13 +507,9 @@ const registerIpcHandlers = (): void => {
   ipcMain.handle('openai:set-config', (_event, payload: unknown) => {
     const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
     const apiKey = typeof record.apiKey === 'string' ? record.apiKey.trim() : '';
-    const model = typeof record.model === 'string' ? record.model.trim() : '';
     const next: OpenAiConfig = {};
     if (apiKey) {
       next.apiKey = apiKey;
-    }
-    if (model) {
-      next.model = model;
     }
     const ok = writeOpenAiConfig(next);
     return { ok, status: getOpenAiStatus() };

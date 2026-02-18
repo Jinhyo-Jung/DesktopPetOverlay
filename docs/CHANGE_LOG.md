@@ -1,3 +1,10 @@
+## 2026-02-18T18:28:34+09:00
+- 결론: OpenAI 키 로딩을 앱 내 설정(userData)로 단일화하고, 설정 패널에서 정확한 저장 경로를 표시하도록 개선했다.
+- `code/src/main.ts`에서 환경변수 기반 OpenAI 키/모델 폴백을 제거하고 `userData/openai-config.json`만 사용하도록 변경했다.
+- `index.html`, `code/src/renderer.ts`에서 모델 입력 UI를 제거하고, 도움말 문구에 실제 설정 파일 경로(`configPath`)를 표시하도록 수정했다.
+- API 키 설정 버튼은 `대화하기`를 누른 뒤에만 활성화되도록 잠금 상태를 추가해 사용자 흐름을 단순화했다.
+- 기능 기준서(`docs/specs/DesktopPetOverlay-실구현-기능-기준서.md`)의 OpenAI 키 규칙을 앱 설정 단일 경로로 갱신했다.
+
 ## 2026-02-18T18:16:30+09:00
 - 결론: OpenAI API 키를 앱 내부 GUI로 입력/저장/삭제할 수 있게 하고, 키가 없으면 대화 기능을 명확히 비활성화했다.
 - `index.html`, `code/src/index.css`, `code/src/renderer.ts`에 API 키 설정 패널을 추가해 상태 표시(미설정/설정됨), 저장/삭제 동작을 제공하고 키 미설정 시 `대화하기` 버튼을 비활성화한다.

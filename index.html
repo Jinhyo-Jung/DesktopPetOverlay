@@ -23,19 +23,17 @@
               <span id="chat-status" class="overlay-status">대화창 닫힘</span>
             </div>
             <div class="chat-row chat-row-key">
-              <button id="openai-key-toggle-btn" type="button">API 키 설정</button>
+              <button id="openai-key-toggle-btn" type="button" disabled>API 키 설정</button>
               <span id="openai-key-status" class="overlay-status">API 키 확인 중...</span>
             </div>
             <div id="openai-key-panel" class="openai-key-panel hidden">
               <label for="openai-api-key-input">OpenAI API Key</label>
               <input id="openai-api-key-input" type="password" placeholder="sk-..." autocomplete="off" />
-              <label for="openai-model-input">Model (선택)</label>
-              <input id="openai-model-input" type="text" placeholder="gpt-4o-mini" autocomplete="off" />
               <div class="openai-key-actions">
                 <button id="openai-key-save-btn" type="button">저장</button>
                 <button id="openai-key-clear-btn" type="button" class="danger-button">삭제</button>
               </div>
-              <p class="openai-key-help">키는 PC 로컬(userData)에 저장되며 GitHub에 업로드되지 않습니다.</p>
+              <p id="openai-key-help" class="openai-key-help">키 저장 경로 확인 중...</p>
             </div>
             <div id="chat-box" class="chat-box hidden">
               <div id="chat-log" class="chat-log" aria-live="polite"></div>
