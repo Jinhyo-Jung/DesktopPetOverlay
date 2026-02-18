@@ -146,7 +146,7 @@ const CHAT_OPEN_COOLDOWN_MS = 60_000;
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 type MainMotionMode = 'random' | 'fixed';
-type MainEmotionMode = 'happy' | 'tired' | 'sleep' | 'neutral' | 'dirty';
+type MainEmotionMode = 'happy' | 'sick' | 'sleep' | 'neutral' | 'dirty';
 
 interface PlaygroundPet {
   id: string;
@@ -1370,7 +1370,7 @@ function resolveMainEmotionMode(nowMs: number): MainEmotionMode {
     return 'dirty';
   }
   if (state.stats.health <= 60) {
-    return 'tired';
+    return 'sick';
   }
   if (state.stats.happiness >= 90) {
     return 'happy';

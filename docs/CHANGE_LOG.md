@@ -1,3 +1,10 @@
+## 2026-02-18T17:06:53+09:00
+- 결론: 감정 키워드 `tired`(및 오타 `tierd`)를 `sick`으로 통일하고, 에셋/스프라이트/런타임 참조를 일괄 정리했다.
+- `source/pet_emotions/main_cat/*`에서 `tired*.png`, `tierd*.png` 파일명을 `sick*.png`로 변경했다.
+- `source/pet_sprites/main_cat.json`의 프레임 ID/경로/상태 매핑(`idle`, `fall`)을 `sick`, `sick_01`, `sick_02` 기준으로 수정했다.
+- `code/src/renderer.ts`의 메인 감정 타입과 건강도 기반 감정 선택을 `tired` 대신 `sick`으로 변경했다.
+- `code/scripts/extract-main-cat-emotions.ps1`, `source/pet_emotions/main_cat/README.md`, 기능 기준서(`docs/specs/DesktopPetOverlay-실구현-기능-기준서.md`)를 새 명칭에 맞게 갱신했다.
+
 ## 2026-02-18T16:20:03+09:00
 - 결론: exe 종료 경로를 단일 플로우로 통합하고, 종료 버튼/Alt+F4/창 닫기 모두에서 일일 리포트 저장·확인 로직이 동일하게 동작하도록 수정했다.
 - `code/src/main.ts`에서 `BrowserWindow close`를 가로채 렌더러 종료 확인 IPC(`app:close-requested`, `app:confirm-close`)로 통합했다.

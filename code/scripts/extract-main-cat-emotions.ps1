@@ -18,7 +18,7 @@ try {
   $frames = @(
     @{ id = "neutral"; x = 0; y = 0 },
     @{ id = "happy"; x = 512; y = 0 },
-    @{ id = "tired"; x = 0; y = 512 },
+    @{ id = "sick"; x = 0; y = 512 },
     @{ id = "sleep"; x = 512; y = 512 }
   )
 

@@ -16,9 +16,9 @@
     { "id": "sleep_01", "image": "source/pet_emotions/main_cat/teen/sleep_01.png" },
     { "id": "sleep_02", "image": "source/pet_emotions/main_cat/teen/sleep_02.png" },
     { "id": "sleep_03", "image": "source/pet_emotions/main_cat/teen/sleep_03.png" },
-    { "id": "tired", "image": "source/pet_emotions/main_cat/teen/tired.png" },
-    { "id": "tired_01", "image": "source/pet_emotions/main_cat/teen/tired_01.png" },
-    { "id": "tired_02", "image": "source/pet_emotions/main_cat/teen/tired_02.png" },
+    { "id": "sick", "image": "source/pet_emotions/main_cat/teen/sick.png" },
+    { "id": "sick_01", "image": "source/pet_emotions/main_cat/teen/sick_01.png" },
+    { "id": "sick_02", "image": "source/pet_emotions/main_cat/teen/sick_02.png" },
     { "id": "dirty", "image": "source/pet_emotions/main_cat/teen/dirty.png" },
     { "id": "dirty_01", "image": "source/pet_emotions/main_cat/teen/dirty_01.png" },
     { "id": "dirty_02", "image": "source/pet_emotions/main_cat/teen/dirty_02.png" },
@@ -39,9 +39,9 @@
         "sleep_01",
         "sleep_02",
         "sleep_03",
-        "tired",
-        "tired_01",
-        "tired_02",
+        "sick",
+        "sick_01",
+        "sick_02",
         "dirty",
         "dirty_01",
         "dirty_02",
@@ -73,7 +73,7 @@
       "fps": 7,
       "loop": false
     },
-    "fall": { "emotions": ["tired", "tired_01", "tired_02", "sleep", "sleep_01", "sleep_02", "sleep_03", "dirty", "dirty_01", "dirty_02", "dirty_03"], "fps": 6, "loop": true },
+    "fall": { "emotions": ["sick", "sick_01", "sick_02", "sleep", "sleep_01", "sleep_02", "sleep_03", "dirty", "dirty_01", "dirty_02", "dirty_03"], "fps": 6, "loop": true },
     "drag": { "emotions": ["neutral", "neutral_01", "neutral_02", "neutral_03", "dirty", "dirty_01", "dirty_02", "dirty_03"], "fps": 1, "loop": true }
   }
 }

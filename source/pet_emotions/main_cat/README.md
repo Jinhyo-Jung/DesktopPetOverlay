@@ -10,7 +10,7 @@ Conclusion: stage-separated folders are now the standard, and the current runtim
 - `adult/`가 비어 있어도 런타임은 `main_cat.json`을 기준으로 `teen/`을 읽고, 단계별(`egg/baby/teen`) 파생 로드를 시도한다.
 
 ## Naming Convention
-- Base emotion files: `neutral.png`, `happy.png`, `sleep.png`, `tired.png`, `dirty.png`
+- Base emotion files: `neutral.png`, `happy.png`, `sleep.png`, `sick.png`, `dirty.png`
 - Variants: `happy_01.png`, `happy_02.png`, `neutral_01.png`, etc.
 
 ## Current Runtime Mapping
