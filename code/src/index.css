@@ -117,19 +117,20 @@ body {
 
 .chat-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr);
   gap: 6px;
   align-items: center;
 }
 
-.chat-row.chat-row-key {
-  grid-template-columns: auto minmax(0, 1fr);
-}
-
-#chat-open-btn,
-#openai-key-toggle-btn {
+#chat-open-btn {
   min-width: 92px;
   white-space: nowrap;
+}
+
+#chat-settings-btn {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
 }
 
 .chat-row .overlay-status {
@@ -138,6 +139,27 @@ body {
 
 .chat-box.hidden {
   display: none;
+}
+
+.chat-settings-panel {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #dccf9f;
+  border-radius: 10px;
+  background: #fffdf5;
+  padding: 8px;
+}
+
+.openai-key-status {
+  margin: 0;
+  font-size: 11px;
+  color: #4f4f4f;
+}
+
+.chat-settings-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .chat-log {

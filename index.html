@@ -20,18 +20,25 @@
           <section class="chat-panel" aria-label="Pet chat">
             <div class="chat-row">
               <button id="chat-open-btn" type="button">대화하기</button>
+              <button id="chat-settings-btn" type="button" class="icon-button hidden" title="대화 설정">
+                ⚙
+              </button>
               <span id="chat-status" class="overlay-status">대화창 닫힘</span>
             </div>
-            <div id="openai-key-row" class="chat-row chat-row-key hidden">
-              <button id="openai-key-toggle-btn" type="button" disabled>API 키 설정</button>
-              <span id="openai-key-status" class="overlay-status">API 키 확인 중...</span>
+            <div id="chat-settings-panel" class="chat-settings-panel hidden">
+              <p id="openai-key-status" class="openai-key-status">API 키 확인 중...</p>
+              <div class="chat-settings-actions">
+                <button id="openai-open-folder-btn" type="button">저장 폴더 열기</button>
+                <button id="openai-reenter-btn" type="button">API 키 재입력</button>
+                <button id="openai-delete-btn" type="button" class="danger-button">API 키 삭제</button>
+              </div>
             </div>
             <div id="openai-key-panel" class="openai-key-panel hidden">
               <label for="openai-api-key-input">OpenAI API Key</label>
               <input id="openai-api-key-input" type="password" placeholder="sk-..." autocomplete="off" />
               <div class="openai-key-actions">
                 <button id="openai-key-save-btn" type="button">저장</button>
-                <button id="openai-key-clear-btn" type="button" class="danger-button">삭제</button>
+                <button id="openai-key-clear-btn" type="button" class="danger-button">입력 초기화</button>
               </div>
               <p id="openai-key-help" class="openai-key-help">키 저장 경로 확인 중...</p>
             </div>

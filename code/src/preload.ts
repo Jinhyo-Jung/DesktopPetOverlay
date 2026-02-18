@@ -54,6 +54,7 @@ interface OverlayBridge {
     ok: boolean;
     status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
   }>;
+  openOpenAiConfigDir: () => Promise<{ ok: boolean; path: string; error?: string }>;
 }
 
 const overlayBridge: OverlayBridge = {
@@ -110,6 +111,12 @@ const overlayBridge: OverlayBridge = {
     ipcRenderer.invoke('openai:clear-config') as Promise<{
       ok: boolean;
       status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
+    }>,
+  openOpenAiConfigDir: () =>
+    ipcRenderer.invoke('openai:open-config-directory') as Promise<{
+      ok: boolean;
+      path: string;
+      error?: string;
     }>,
 };
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -138,6 +138,33 @@ const getOpenAiStatus = (): OpenAiStatus => {
     model: resolveOpenAiModel(),
     configPath: getOpenAiConfigPath(),
   };
+};
+
+const normalizeOpenAiError = (
+  status: number,
+  bodyText: string,
+): 'invalid-api-key' | 'quota-exceeded' | 'rate-limited' | 'invalid-request' | 'openai-server-error' | 'openai-request-failed' => {
+  const normalized = bodyText.toLowerCase();
+  if (status === 401) {
+    return 'invalid-api-key';
+  }
+  if (status === 429) {
+    if (
+      normalized.includes('insufficient_quota') ||
+      normalized.includes('quota') ||
+      normalized.includes('billing')
+    ) {
+      return 'quota-exceeded';
+    }
+    return 'rate-limited';
+  }
+  if (status === 400) {
+    return 'invalid-request';
+  }
+  if (status >= 500) {
+    return 'openai-server-error';
+  }
+  return 'openai-request-failed';
 };
 
 const loadEnvFile = (filename: string): void => {
@@ -520,6 +547,21 @@ const registerIpcHandlers = (): void => {
     return { ok, status: getOpenAiStatus() };
   });
 
+  ipcMain.handle('openai:open-config-directory', async () => {
+    const configPath = getOpenAiConfigPath();
+    const configDir = path.dirname(configPath);
+    try {
+      fs.mkdirSync(configDir, { recursive: true });
+    } catch {
+      // Keep attempting to open, shell.openPath will return a descriptive error if needed.
+    }
+    const openError = await shell.openPath(configDir);
+    if (openError) {
+      return { ok: false, path: configDir, error: openError };
+    }
+    return { ok: true, path: configDir };
+  });
+
   ipcMain.handle('pet-chat:send', async (_event, payload: unknown) => {
     const request = payload as PetChatRequest | null;
     const prompt = request && typeof request.prompt === 'string' ? request.prompt.trim() : '';
@@ -550,7 +592,7 @@ const registerIpcHandlers = (): void => {
         const errorText = await response.text();
         return {
           ok: false,
-          error: `openai-${response.status}:${errorText.slice(0, 120)}`,
+          error: normalizeOpenAiError(response.status, errorText),
         };
       }
 

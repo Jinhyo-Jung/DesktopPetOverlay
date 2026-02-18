@@ -67,6 +67,7 @@ interface OverlayBridge {
     ok: boolean;
     status: { hasApiKey: boolean; source: 'config' | 'none'; model: string; configPath: string };
   }>;
+  openOpenAiConfigDir: () => Promise<{ ok: boolean; path: string; error?: string }>;
 }
 
 interface DisplayInfo {
@@ -157,6 +158,7 @@ const IDLE_INACTIVE_THRESHOLD_MS = 45_000;
 const INACTIVE_IMAGE_SWITCH_MS = 7_000;
 const DIRTY_CLEANLINESS_THRESHOLD = 60;
 const CHAT_OPEN_COOLDOWN_MS = 60_000;
+const CHAT_SESSION_MAX_TURNS = 5;
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 type MainMotionMode = 'random' | 'fixed';
@@ -321,15 +323,18 @@ const helpButton = document.getElementById('help-btn') as HTMLButtonElement;
 const reportButton = document.getElementById('report-btn') as HTMLButtonElement;
 const helpPanelElement = document.getElementById('help-panel') as HTMLElement;
 const chatOpenButton = document.getElementById('chat-open-btn') as HTMLButtonElement;
+const chatSettingsButton = document.getElementById('chat-settings-btn') as HTMLButtonElement;
 const chatStatusElement = document.getElementById('chat-status') as HTMLElement;
 const chatBoxElement = document.getElementById('chat-box') as HTMLElement;
 const chatLogElement = document.getElementById('chat-log') as HTMLElement;
 const chatInputElement = document.getElementById('chat-input') as HTMLInputElement;
 const chatSendButton = document.getElementById('chat-send-btn') as HTMLButtonElement;
-const openAiKeyRowElement = document.getElementById('openai-key-row') as HTMLElement;
-const openAiKeyToggleButton = document.getElementById('openai-key-toggle-btn') as HTMLButtonElement;
+const chatSettingsPanelElement = document.getElementById('chat-settings-panel') as HTMLElement;
 const openAiKeyStatusElement = document.getElementById('openai-key-status') as HTMLElement;
 const openAiKeyPanelElement = document.getElementById('openai-key-panel') as HTMLElement;
+const openAiOpenFolderButton = document.getElementById('openai-open-folder-btn') as HTMLButtonElement;
+const openAiReenterButton = document.getElementById('openai-reenter-btn') as HTMLButtonElement;
+const openAiDeleteButton = document.getElementById('openai-delete-btn') as HTMLButtonElement;
 const openAiApiKeyInputElement = document.getElementById('openai-api-key-input') as HTMLInputElement;
 const openAiKeySaveButton = document.getElementById('openai-key-save-btn') as HTMLButtonElement;
 const openAiKeyClearButton = document.getElementById('openai-key-clear-btn') as HTMLButtonElement;
@@ -383,6 +388,7 @@ let openAiStatus: { hasApiKey: boolean; source: 'config' | 'none'; model: string
 };
 let openAiKeyPanelVisible = false;
 let openAiKeySetupUnlocked = false;
+let chatSettingsVisible = false;
 let closeHandled = false;
 
 const overlayBridge = window.overlayBridge;
@@ -565,13 +571,38 @@ function renderChatLog(): void {
   chatLogElement.scrollTop = chatLogElement.scrollHeight;
 }
 
+function getFriendlyChatFailureMessage(errorCode: string | undefined): string {
+  if (!errorCode) {
+    return '지금은 답변을 만들지 못했어. 잠시 후 다시 시도해줘.';
+  }
+  if (errorCode === 'missing-api-key') {
+    return 'API 키가 등록되어 있지 않아 대화를 시작할 수 없어요. 키를 먼저 입력해 주세요.';
+  }
+  if (errorCode === 'invalid-api-key') {
+    return 'API 키가 올바르지 않습니다. 키를 다시 확인해서 입력해 주세요.';
+  }
+  if (errorCode === 'quota-exceeded') {
+    return 'API 사용량 한도(토큰/요금)가 소진되었습니다. 결제/사용량 상태를 확인해 주세요.';
+  }
+  if (errorCode === 'rate-limited') {
+    return '요청이 너무 많아 잠시 제한되었어요. 잠깐 후 다시 시도해 주세요.';
+  }
+  if (errorCode === 'network-failed') {
+    return '네트워크 연결이 불안정해 응답을 받지 못했어요. 연결 상태를 확인해 주세요.';
+  }
+  if (errorCode === 'openai-server-error') {
+    return 'OpenAI 서버 상태가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.';
+  }
+  return '지금은 답변을 만들지 못했어. 잠시 후 다시 시도해줘.';
+}
+
 function updateChatUI(): void {
   const remainingMs = getChatOpenRemainingMs();
   if (!chatVisible) {
     chatBoxElement.classList.add('hidden');
     if (!openAiStatus.hasApiKey) {
       chatOpenButton.disabled = false;
-      chatStatusElement.textContent = 'API 키가 필요합니다. (대화하기를 누른 뒤 API 키 설정에서 등록)';
+      chatStatusElement.textContent = 'API 키가 필요합니다. (대화하기 후 ⚙에서 설정)';
       chatSendButton.disabled = true;
       chatInputElement.disabled = true;
       return;
@@ -602,15 +633,21 @@ function updateChatUI(): void {
 function updateOpenAiKeyUI(): void {
   if (!openAiKeySetupUnlocked) {
     openAiKeyPanelVisible = false;
+    chatSettingsVisible = false;
   }
-  openAiKeyRowElement.classList.toggle('hidden', !openAiKeySetupUnlocked);
+  chatSettingsButton.classList.toggle('hidden', !openAiKeySetupUnlocked);
+  chatSettingsPanelElement.classList.toggle(
+    'hidden',
+    !openAiKeySetupUnlocked || !chatSettingsVisible,
+  );
   openAiKeyPanelElement.classList.toggle('hidden', !openAiKeyPanelVisible);
   const sourceLabel = openAiStatus.source === 'config' ? '앱 저장' : '없음';
   openAiKeyStatusElement.textContent = openAiStatus.hasApiKey
-    ? `설정됨 (${sourceLabel}) · model ${openAiStatus.model}`
+    ? `현재 API 키 상태: 설정됨 (${sourceLabel})`
     : '미설정 · 대화 기능을 사용하려면 키가 필요합니다.';
-  openAiKeyClearButton.disabled = openAiStatus.source !== 'config';
-  openAiKeyToggleButton.disabled = !openAiKeySetupUnlocked;
+  openAiDeleteButton.disabled = openAiStatus.source !== 'config';
+  openAiOpenFolderButton.disabled = !openAiStatus.configPath;
+  openAiReenterButton.disabled = false;
   if (openAiKeyHelpElement) {
     openAiKeyHelpElement.textContent = openAiStatus.configPath
       ? `키 저장 경로: ${openAiStatus.configPath}`
@@ -637,6 +674,10 @@ async function refreshOpenAiStatus(): Promise<void> {
 function closeChatSession(limitReached: boolean): void {
   chatVisible = false;
   chatClosedByTurnLimit = limitReached;
+  if (limitReached) {
+    chatState.lastOpenedAt = Date.now();
+    persistChatPersistedState();
+  }
   chatInputElement.value = '';
   updateChatUI();
 }
@@ -645,6 +686,7 @@ function collapseChatPanel(): void {
   chatVisible = false;
   chatClosedByTurnLimit = false;
   chatInputElement.value = '';
+  chatSettingsVisible = false;
   openAiKeyPanelVisible = false;
   openAiKeySetupUnlocked = false;
   updateOpenAiKeyUI();
@@ -666,12 +708,12 @@ function openChatSession(): void {
   }
   chatVisible = true;
   chatClosedByTurnLimit = false;
-  chatSessionMaxTurns = 3 + Math.floor(Math.random() * 3);
+  chatSettingsVisible = false;
+  chatSessionMaxTurns = CHAT_SESSION_MAX_TURNS;
   chatSessionUsedTurns = 0;
   chatMessages = [{ role: 'pet', text: '안녕! 오늘 컨디션 기준으로 짧게 대화해볼까?' }];
-  chatState.lastOpenedAt = Date.now();
-  persistChatPersistedState();
   renderChatLog();
+  updateOpenAiKeyUI();
   updateChatUI();
   chatInputElement.focus();
 }
@@ -713,19 +755,23 @@ async function sendChatMessage(): Promise<void> {
   chatSendButton.disabled = true;
   try {
     const response = await overlayBridge.sendPetChatPrompt(buildChatPrompt(input));
-    const answer =
-      response.ok && response.text
-        ? response.text
-        : `지금은 답변을 만들지 못했어. (${response.error ?? 'unknown'})`;
-    chatMessages.push({ role: 'pet', text: answer });
-    if (!response.ok && response.error === 'missing-api-key') {
+    if (response.ok && response.text) {
+      chatMessages.push({ role: 'pet', text: response.text });
+      chatSessionUsedTurns += 1;
+    } else {
+      chatMessages.push({ role: 'pet', text: getFriendlyChatFailureMessage(response.error) });
+    }
+    if (
+      !response.ok &&
+      (response.error === 'missing-api-key' || response.error === 'invalid-api-key')
+    ) {
+      chatSettingsVisible = true;
       openAiKeyPanelVisible = true;
       void refreshOpenAiStatus();
     }
   } catch {
-    chatMessages.push({ role: 'pet', text: '네트워크가 불안정해서 답을 못 했어.' });
+    chatMessages.push({ role: 'pet', text: getFriendlyChatFailureMessage('network-failed') });
   }
-  chatSessionUsedTurns += 1;
   renderChatLog();
   if (chatSessionUsedTurns >= chatSessionMaxTurns) {
     chatMessages.push({ role: 'pet', text: '오늘 대화는 여기까지! 1분 뒤에 다시 열 수 있어.' });
@@ -2815,8 +2861,11 @@ chatOpenButton.addEventListener('click', () => {
   openChatSession();
 });
 
-openAiKeyToggleButton.addEventListener('click', () => {
-  openAiKeyPanelVisible = !openAiKeyPanelVisible;
+chatSettingsButton.addEventListener('click', () => {
+  if (!openAiKeySetupUnlocked) {
+    return;
+  }
+  chatSettingsVisible = !chatSettingsVisible;
   updateOpenAiKeyUI();
 });
 
@@ -2834,6 +2883,7 @@ openAiKeySaveButton.addEventListener('click', async () => {
   if (result.ok) {
     openAiApiKeyInputElement.value = '';
     openAiStatus = result.status;
+    chatSettingsVisible = true;
     openAiKeyPanelVisible = false;
     updateOpenAiKeyUI();
     updateChatUI();
@@ -2843,7 +2893,31 @@ openAiKeySaveButton.addEventListener('click', async () => {
   }
 });
 
-openAiKeyClearButton.addEventListener('click', async () => {
+openAiKeyClearButton.addEventListener('click', () => {
+  openAiApiKeyInputElement.value = '';
+  openAiApiKeyInputElement.focus();
+  overlayHintElement.textContent = '입력한 API 키를 지웠습니다. 다시 입력해 주세요.';
+});
+
+openAiOpenFolderButton.addEventListener('click', async () => {
+  if (!overlayBridge) {
+    return;
+  }
+  const result = await overlayBridge.openOpenAiConfigDir();
+  if (result.ok) {
+    overlayHintElement.textContent = `저장 폴더를 열었습니다: ${result.path}`;
+  } else {
+    overlayHintElement.textContent = '저장 폴더를 열지 못했습니다. 경로를 수동으로 확인해 주세요.';
+  }
+});
+
+openAiReenterButton.addEventListener('click', () => {
+  openAiKeyPanelVisible = true;
+  updateOpenAiKeyUI();
+  openAiApiKeyInputElement.focus();
+});
+
+openAiDeleteButton.addEventListener('click', async () => {
   if (!overlayBridge) {
     return;
   }
@@ -2853,6 +2927,14 @@ openAiKeyClearButton.addEventListener('click', async () => {
   }
   const result = await overlayBridge.clearOpenAiConfig();
   openAiStatus = result.status;
+  chatVisible = false;
+  chatClosedByTurnLimit = false;
+  chatSettingsVisible = true;
+  openAiKeyPanelVisible = true;
+  chatInputElement.value = '';
+  chatSessionUsedTurns = 0;
+  chatSessionMaxTurns = CHAT_SESSION_MAX_TURNS;
+  chatMessages = [];
   updateOpenAiKeyUI();
   updateChatUI();
   overlayHintElement.textContent = result.ok ? 'OpenAI API 키를 삭제했습니다.' : 'API 키 삭제에 실패했습니다.';
