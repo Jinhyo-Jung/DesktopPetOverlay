@@ -11,6 +11,7 @@
 ### 1) 오버레이 창/입력 계층
 - Electron 창은 투명 배경(`transparent: true`), 항상 위(`alwaysOnTop: true`), 프레임 없음(`frame: false`)으로 생성된다.
 - 창은 시작 시 현재 대상 모니터의 작업영역(workArea) 전체 크기로 맞춰진다.
+- 앱 시작 직후에는 로딩 오버레이를 먼저 표시하고, 렌더러 초기 렌더/스프라이트 초기화 완료 후 오버레이를 숨긴다.
 - 클릭 통과(click-through)는 UI 버튼 또는 단축키 `Ctrl+Alt+Shift+O`로 토글된다.
 - 클릭 통과 활성 시 입력 무시(`setIgnoreMouseEvents`)가 적용되고, 단축키로 복구할 수 있다.
 - 포인터 캡처는 캐릭터/패널 hover 및 드래그 상태에 따라 동적으로 켜지고 꺼진다.

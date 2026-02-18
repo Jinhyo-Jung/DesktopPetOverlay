@@ -262,6 +262,7 @@ const statFillElements: Record<StatKey, HTMLElement> = {
   health: document.getElementById('health-fill') as HTMLElement,
 };
 
+const bootLoadingScreenElement = document.getElementById('boot-loading-screen') as HTMLElement | null;
 const faceElement = document.getElementById('pet-face') as HTMLElement;
 const stageTextElement = document.getElementById('stage-text') as HTMLElement;
 const warningTextElement = document.getElementById('warning-text') as HTMLElement;
@@ -358,6 +359,13 @@ const overlayBridge = window.overlayBridge;
 
 type CountedInputEvent = 'keydown' | 'mousedown' | 'mousemove' | 'wheel' | 'touchstart';
 type InputCounter = Record<CountedInputEvent, number>;
+
+function setBootLoadingVisible(visible: boolean): void {
+  if (!bootLoadingScreenElement) {
+    return;
+  }
+  bootLoadingScreenElement.classList.toggle('hidden', !visible);
+}
 
 function markUserInteraction(nowMs: number = Date.now()): void {
   lastInteractionAtMs = nowMs;
@@ -2767,6 +2775,14 @@ setInterval(() => {
     updateChatUI();
   }
 }, 1_000);
-void initializeSpritePipeline().then(() => {
-  renderPlayground();
-});
+const bootLoadingFailSafe = window.setTimeout(() => {
+  setBootLoadingVisible(false);
+}, 4_000);
+void initializeSpritePipeline()
+  .then(() => {
+    renderPlayground();
+  })
+  .finally(() => {
+    window.clearTimeout(bootLoadingFailSafe);
+    setBootLoadingVisible(false);
+  });
