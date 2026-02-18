@@ -1,3 +1,9 @@
+## 2026-02-18T15:17:32+09:00
+- 현재 코드 구현 기준 기능을 고정하기 위해 docs/specs/DesktopPetOverlay-실구현-기능-기준서.md를 신규 추가하고, 오버레이/모니터/캐릭터 모션/육성/저장/활동 EXP/초기화 동작을 기준 명세로 문서화했다.
+- AGENTS.md에 기능 변경 작업 시 기준서 선확인 및 변경 시 동시 갱신 규칙을 추가해, 이후 대화에서도 기준 문서 기반 검증이 강제되도록 정리했다.
+- skills/desktop-pet-dev/SKILL.md, skills/overlay-window-spec/SKILL.md, skills/overlay-window-spec/references/overlay-checklist.md, docs/guides/스킬 사용 가이드.md를 갱신해 기준서 우선 확인/회귀 검증 흐름을 스킬 운영 규칙으로 반영했다.
+- skills/overlay-window-spec/scripts/check_overlay_flags.sh 기본 경로를 현재 저장소 구조(code/src/main.ts)에 맞춰 수정했다.
+
 # CHANGE_LOG
 
 ## 2026-02-15T16:39:58+09:00

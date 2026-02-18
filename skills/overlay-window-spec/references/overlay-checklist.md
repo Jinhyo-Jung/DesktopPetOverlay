@@ -1,5 +1,9 @@
 # Overlay Checklist
 
+## Baseline First
+1. Read `docs/specs/DesktopPetOverlay-실구현-기능-기준서.md` before changing behavior.
+2. If behavior changes, update the baseline doc in the same commit.
+
 ## Window Flags
 1. `transparent: true`
 2. `alwaysOnTop: true`

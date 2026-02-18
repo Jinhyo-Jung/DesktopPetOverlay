@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FILE="${1:-src/main.ts}"
+FILE="${1:-code/src/main.ts}"
 
 if [[ ! -f "$FILE" ]]; then
   echo "File not found: $FILE" >&2

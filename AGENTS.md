@@ -25,3 +25,7 @@
 
 7. Documentation writing style
 - Write all new/updated documents in a top-down style (state conclusion first, then details).
+
+8. Feature baseline document (mandatory)
+- Before implementing, deleting, or modifying any feature, read `docs/specs/DesktopPetOverlay-실구현-기능-기준서.md` first.
+- After changes, verify no regression against that baseline document and update the document in the same commit if behavior changed.
