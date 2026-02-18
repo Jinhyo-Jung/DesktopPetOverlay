@@ -37,6 +37,9 @@ interface OverlayBridge {
   moveToDisplay: (displayId: number) => Promise<boolean>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
   sendPetChatPrompt: (prompt: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
+  requestClose: () => Promise<boolean>;
+  confirmClose: () => Promise<boolean>;
+  onCloseRequested: (callback: () => void) => () => void;
 }
 
 const overlayBridge: OverlayBridge = {
@@ -67,6 +70,17 @@ const overlayBridge: OverlayBridge = {
       text?: string;
       error?: string;
     }>,
+  requestClose: () => ipcRenderer.invoke('app:request-close') as Promise<boolean>,
+  confirmClose: () => ipcRenderer.invoke('app:confirm-close') as Promise<boolean>,
+  onCloseRequested: (callback: () => void) => {
+    const listener = () => {
+      callback();
+    };
+    ipcRenderer.on('app:close-requested', listener);
+    return () => {
+      ipcRenderer.removeListener('app:close-requested', listener);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('overlayBridge', overlayBridge);

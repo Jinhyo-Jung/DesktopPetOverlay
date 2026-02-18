@@ -45,6 +45,10 @@ interface PetChatRequest {
   prompt: string;
 }
 
+interface CloseFlowState {
+  requested: boolean;
+}
+
 const DEFAULT_PREFERENCES: OverlayPreferences = {
   clickThroughEnabled: false,
 };
@@ -57,6 +61,7 @@ let mainWindow: BrowserWindow | null = null;
 let overlayPreferences: OverlayPreferences = { ...DEFAULT_PREFERENCES };
 let clickThroughShortcutRegistered = false;
 let pointerCaptureEnabled = true;
+const closeFlowState: CloseFlowState = { requested: false };
 
 const OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
@@ -336,6 +341,14 @@ const createWindow = () => {
 
   mainWindow.on('move', persistWindowPosition);
   mainWindow.on('close', persistWindowPosition);
+  mainWindow.on('close', (event) => {
+    if (!closeFlowState.requested) {
+      event.preventDefault();
+      mainWindow?.webContents.send('app:close-requested');
+      return;
+    }
+    closeFlowState.requested = false;
+  });
 
   applyClickThrough(overlayPreferences.clickThroughEnabled);
 };
@@ -397,6 +410,23 @@ const registerIpcHandlers = (): void => {
     return true;
   });
 
+  ipcMain.handle('app:request-close', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return false;
+    }
+    mainWindow.close();
+    return true;
+  });
+
+  ipcMain.handle('app:confirm-close', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return false;
+    }
+    closeFlowState.requested = true;
+    mainWindow.close();
+    return true;
+  });
+
   ipcMain.handle('pet-chat:send', async (_event, payload: unknown) => {
     const request = payload as PetChatRequest | null;
     const prompt = request && typeof request.prompt === 'string' ? request.prompt.trim() : '';
@@ -424,13 +454,37 @@ const registerIpcHandlers = (): void => {
       });
 
       if (!response.ok) {
-        return { ok: false, error: `openai-${response.status}` };
+        const errorText = await response.text();
+        return {
+          ok: false,
+          error: `openai-${response.status}:${errorText.slice(0, 120)}`,
+        };
       }
 
       const data = (await response.json()) as {
         output_text?: unknown;
+        output?: Array<{
+          content?: Array<{
+            type?: string;
+            text?: string;
+          }>;
+        }>;
       };
-      const text = typeof data.output_text === 'string' ? data.output_text.trim() : '';
+      let text = typeof data.output_text === 'string' ? data.output_text.trim() : '';
+      if (!text && Array.isArray(data.output)) {
+        const chunks: string[] = [];
+        for (const item of data.output) {
+          if (!item || !Array.isArray(item.content)) {
+            continue;
+          }
+          for (const content of item.content) {
+            if (typeof content?.text === 'string' && content.text.trim().length > 0) {
+              chunks.push(content.text.trim());
+            }
+          }
+        }
+        text = chunks.join('\n').trim();
+      }
       if (!text) {
         return { ok: false, error: 'empty-response' };
       }

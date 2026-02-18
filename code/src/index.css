@@ -451,6 +451,11 @@ h1 {
   gap: 8px;
 }
 
+.action-row.bottom-row {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 8px;
+}
+
 button {
   border: 0;
   border-radius: 10px;

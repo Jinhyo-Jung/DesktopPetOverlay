@@ -50,6 +50,9 @@ interface OverlayBridge {
   moveToDisplay: (displayId: number) => Promise<boolean>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
   sendPetChatPrompt: (prompt: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
+  requestClose: () => Promise<boolean>;
+  confirmClose: () => Promise<boolean>;
+  onCloseRequested: (callback: () => void) => () => void;
 }
 
 interface DisplayInfo {
@@ -268,6 +271,7 @@ const expFillElement = document.getElementById('exp-fill') as HTMLElement;
 const feedButton = document.getElementById('feed-btn') as HTMLButtonElement;
 const cleanButton = document.getElementById('clean-btn') as HTMLButtonElement;
 const playButton = document.getElementById('play-btn') as HTMLButtonElement;
+const quitButton = document.getElementById('quit-btn') as HTMLButtonElement;
 const clickThroughToggleButton = document.getElementById(
   'click-through-toggle-btn',
 ) as HTMLButtonElement;
@@ -348,6 +352,7 @@ let chatClosedByTurnLimit = false;
 let chatSessionMaxTurns = 0;
 let chatSessionUsedTurns = 0;
 let chatMessages: ChatMessage[] = [];
+let closeHandled = false;
 
 const overlayBridge = window.overlayBridge;
 
@@ -455,6 +460,39 @@ function getDailyReportText(): string {
     `활동 EXP 자동 ${activitySnapshot.dailyActivityExp}, 수동 ${activitySnapshot.dailyFallbackExp}\n` +
     encouragement
   );
+}
+
+function persistDailyReportBeforeClose(): string {
+  const reportSummary = getDailyReportText();
+  pendingDailyReport = {
+    dayKey: getLocalDayKey(new Date()),
+    summary: reportSummary,
+    createdAt: new Date().toISOString(),
+    viewed: false,
+  };
+  persistPendingDailyReport(pendingDailyReport);
+  return reportSummary;
+}
+
+async function runCloseFlowAndConfirm(): Promise<void> {
+  if (closeHandled) {
+    return;
+  }
+  closeHandled = true;
+  const reportSummary = persistDailyReportBeforeClose();
+  const viewNow = window.confirm('오늘의 요약/격려 리포트를 지금 확인할까요?');
+  if (viewNow) {
+    window.alert(reportSummary);
+    if (pendingDailyReport) {
+      pendingDailyReport = { ...pendingDailyReport, viewed: true };
+      persistPendingDailyReport(pendingDailyReport);
+    }
+  }
+  if (overlayBridge) {
+    await overlayBridge.confirmClose();
+  } else {
+    window.close();
+  }
 }
 
 function updateReportButtonVisibility(): void {
@@ -580,7 +618,7 @@ async function sendChatMessage(): Promise<void> {
     const answer =
       response.ok && response.text
         ? response.text
-        : '지금은 생각이 끊겼어. 잠시 뒤에 다시 열어서 말 걸어줘.';
+        : `지금은 답변을 만들지 못했어. (${response.error ?? 'unknown'})`;
     chatMessages.push({ role: 'pet', text: answer });
   } catch {
     chatMessages.push({ role: 'pet', text: '네트워크가 불안정해서 답을 못 했어.' });
@@ -2418,6 +2456,9 @@ addCharacterButton.disabled = true;
 removeCharacterButton.disabled = true;
 addCharacterButton.addEventListener('click', addBuddy);
 removeCharacterButton.addEventListener('click', removeBuddy);
+quitButton.addEventListener('click', () => {
+  void runCloseFlowAndConfirm();
+});
 
 panelDragHandleElement.addEventListener('pointerdown', (event: PointerEvent) => {
   if (clickThroughEnabled || !uiPanelVisible) {
@@ -2594,22 +2635,8 @@ activityCheckinButton.addEventListener('click', () => {
 });
 
 window.addEventListener('beforeunload', () => {
-  const reportSummary = getDailyReportText();
-  pendingDailyReport = {
-    dayKey: getLocalDayKey(new Date()),
-    summary: reportSummary,
-    createdAt: new Date().toISOString(),
-    viewed: false,
-  };
-  persistPendingDailyReport(pendingDailyReport);
-  const viewNow = window.confirm('오늘의 요약/격려 리포트를 지금 확인할까요?');
-  if (viewNow) {
-    window.alert(reportSummary);
-    pendingDailyReport = {
-      ...pendingDailyReport,
-      viewed: true,
-    };
-    persistPendingDailyReport(pendingDailyReport);
+  if (!closeHandled) {
+    persistDailyReportBeforeClose();
   }
   if (liveLoopHandle !== 0) {
     window.cancelAnimationFrame(liveLoopHandle);
@@ -2653,8 +2680,12 @@ if (overlayBridge) {
   const unsubscribe = overlayBridge.onClickThroughChanged((overlayState) => {
     applyOverlayState(overlayState);
   });
+  const unsubscribeCloseRequested = overlayBridge.onCloseRequested(() => {
+    void runCloseFlowAndConfirm();
+  });
 
   window.addEventListener('beforeunload', unsubscribe, { once: true });
+  window.addEventListener('beforeunload', unsubscribeCloseRequested, { once: true });
 } else {
   clickThroughToggleButton.disabled = true;
   clickThroughStatusElement.textContent = '브리지 없음';

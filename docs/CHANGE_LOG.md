@@ -1,3 +1,11 @@
+## 2026-02-18T16:20:03+09:00
+- 결론: exe 종료 경로를 단일 플로우로 통합하고, 종료 버튼/Alt+F4/창 닫기 모두에서 일일 리포트 저장·확인 로직이 동일하게 동작하도록 수정했다.
+- `code/src/main.ts`에서 `BrowserWindow close`를 가로채 렌더러 종료 확인 IPC(`app:close-requested`, `app:confirm-close`)로 통합했다.
+- `code/src/preload.ts`에 종료 브리지(`requestClose`, `confirmClose`, `onCloseRequested`)를 추가했다.
+- `index.html`, `code/src/index.css`, `code/src/renderer.ts`를 갱신해 패널 하단 `종료` 버튼을 추가하고, 종료 버튼/Alt+F4/창 닫기에서 공통으로 리포트 저장/즉시 확인(confirm+alert) 후 종료되도록 정리했다.
+- OpenAI 응답 파싱을 `output_text` + `output[].content[].text` 모두 지원하도록 보강하고, 실패 시 상태코드/오류 본문 일부를 반환해 원인 확인이 가능하도록 개선했다.
+- 기능 변경에 맞춰 기준서 `docs/specs/DesktopPetOverlay-실구현-기능-기준서.md`를 동시 갱신했다.
+
 ## 2026-02-18T15:59:35+09:00
 - 결론: 성장 단계 전환 메시지, 일일 요약/격려 리포트, OpenAI 기반 펫 대화 기능을 기준서와 함께 코드로 통합했다.
 - `code/src/renderer.ts`, `index.html`, `code/src/index.css`를 갱신해 패널 최상단 `대화하기` UI와 대화 로그/입력창을 추가하고, 세션당 응답 3~5회 제한 및 재오픈 1분 쿨다운 로직을 구현했다.
