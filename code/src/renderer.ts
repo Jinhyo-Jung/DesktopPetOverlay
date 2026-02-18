@@ -18,6 +18,7 @@ import {
   type ActivityExpSnapshot,
   DAILY_ACTIVITY_EXP_CAP,
   FALLBACK_COOLDOWN_MS,
+  getLocalDayKey,
   grantActivityExp,
   grantFallbackExp,
   loadActivitySnapshot,
@@ -48,6 +49,7 @@ interface OverlayBridge {
   getDisplays: () => Promise<DisplayInfo[]>;
   moveToDisplay: (displayId: number) => Promise<boolean>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
+  sendPetChatPrompt: (prompt: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
 }
 
 interface DisplayInfo {
@@ -89,6 +91,12 @@ const STAGE_EXP_NEXT: Record<Stage, number> = {
   Adult: 240,
 };
 
+const STAGE_TRANSITION_MESSAGE: Record<Exclude<Stage, 'Egg'>, string> = {
+  Baby: '진화 완료: Baby! 이제 작은 발걸음으로 세상을 배워가요.',
+  Teen: '진화 완료: Teen! 자신감이 붙어서 모험심이 커졌어요.',
+  Adult: '진화 완료: Adult! 믿음직한 성체로 완전히 성장했어요.',
+};
+
 const BUDDY_EMOJI_POOL = ['🐶', '🐰', '🦊', '🐼', '🐸', '🐵'];
 const CHARACTER_STORAGE_KEY = 'desktop-pet-overlay-characters-v1';
 const UI_PANEL_STORAGE_KEY = 'desktop-pet-overlay-ui-panel-visible-v1';
@@ -97,6 +105,8 @@ const CHARACTER_SIZE_LEVEL_STORAGE_KEY = 'desktop-pet-overlay-character-size-lev
 const MAIN_MOTION_MODE_STORAGE_KEY = 'desktop-pet-overlay-main-motion-mode-v1';
 const SAVE_STORAGE_KEY = 'desktop-pet-overlay-save';
 const ACTIVITY_STORAGE_KEY = 'desktop-pet-overlay-activity-exp-v1';
+const DAILY_REPORT_STORAGE_KEY = 'desktop-pet-overlay-daily-report-v1';
+const CHAT_STATE_STORAGE_KEY = 'desktop-pet-overlay-chat-state-v1';
 const DRAG_THRESHOLD = 4;
 const PET_BASE_NODE_SIZE = 88;
 const MAIN_DEFAULT_MARGIN_X = 48;
@@ -129,6 +139,7 @@ const HAPPY_IMAGE_SWITCH_MS = 5_000;
 const IDLE_INACTIVE_THRESHOLD_MS = 45_000;
 const INACTIVE_IMAGE_SWITCH_MS = 7_000;
 const DIRTY_CLEANLINESS_THRESHOLD = 60;
+const CHAT_OPEN_COOLDOWN_MS = 60_000;
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 type MainMotionMode = 'random' | 'fixed';
@@ -146,6 +157,24 @@ interface PlaygroundPet {
 interface UiPanelPosition {
   x: number;
   y: number;
+}
+
+interface DailyReport {
+  dayKey: string;
+  summary: string;
+  createdAt: string;
+  viewed: boolean;
+}
+
+interface ChatPersistedState {
+  lastOpenedAt: number;
+}
+
+type ChatRole = 'user' | 'pet';
+
+interface ChatMessage {
+  role: ChatRole;
+  text: string;
 }
 
 type PetVisualState = 'idle' | 'walk' | 'jump' | 'fall' | 'drag';
@@ -270,7 +299,14 @@ const activityCheckinButton = document.getElementById(
 const activityStatusElement = document.getElementById('activity-status') as HTMLElement;
 const activityMetricsElement = document.getElementById('activity-metrics') as HTMLElement;
 const helpButton = document.getElementById('help-btn') as HTMLButtonElement;
+const reportButton = document.getElementById('report-btn') as HTMLButtonElement;
 const helpPanelElement = document.getElementById('help-panel') as HTMLElement;
+const chatOpenButton = document.getElementById('chat-open-btn') as HTMLButtonElement;
+const chatStatusElement = document.getElementById('chat-status') as HTMLElement;
+const chatBoxElement = document.getElementById('chat-box') as HTMLElement;
+const chatLogElement = document.getElementById('chat-log') as HTMLElement;
+const chatInputElement = document.getElementById('chat-input') as HTMLInputElement;
+const chatSendButton = document.getElementById('chat-send-btn') as HTMLButtonElement;
 
 let state: PetState = loadState();
 let clickThroughEnabled = false;
@@ -305,6 +341,13 @@ let dragLockCount = 0;
 const petMotionMap = new Map<string, PetMotion>();
 let liveLoopHandle = 0;
 let liveLoopLastTs = 0;
+let pendingDailyReport: DailyReport | null = loadPendingDailyReport();
+const chatState: ChatPersistedState = loadChatPersistedState();
+let chatVisible = false;
+let chatClosedByTurnLimit = false;
+let chatSessionMaxTurns = 0;
+let chatSessionUsedTurns = 0;
+let chatMessages: ChatMessage[] = [];
 
 const overlayBridge = window.overlayBridge;
 
@@ -338,6 +381,219 @@ function getCooldownRemainingMs(lastFallbackAt: string | null): number {
 
   const elapsed = Date.now() - Date.parse(lastFallbackAt);
   return Math.max(0, FALLBACK_COOLDOWN_MS - elapsed);
+}
+
+function loadPendingDailyReport(): DailyReport | null {
+  try {
+    const raw = window.localStorage.getItem(DAILY_REPORT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<DailyReport>;
+    if (
+      typeof parsed.dayKey !== 'string' ||
+      typeof parsed.summary !== 'string' ||
+      typeof parsed.createdAt !== 'string' ||
+      typeof parsed.viewed !== 'boolean'
+    ) {
+      return null;
+    }
+    return {
+      dayKey: parsed.dayKey,
+      summary: parsed.summary,
+      createdAt: parsed.createdAt,
+      viewed: parsed.viewed,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistPendingDailyReport(report: DailyReport | null): void {
+  if (!report) {
+    window.localStorage.removeItem(DAILY_REPORT_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(DAILY_REPORT_STORAGE_KEY, JSON.stringify(report));
+}
+
+function loadChatPersistedState(): ChatPersistedState {
+  try {
+    const raw = window.localStorage.getItem(CHAT_STATE_STORAGE_KEY);
+    if (!raw) {
+      return { lastOpenedAt: 0 };
+    }
+    const parsed = JSON.parse(raw) as Partial<ChatPersistedState>;
+    if (!Number.isFinite(parsed.lastOpenedAt)) {
+      return { lastOpenedAt: 0 };
+    }
+    return { lastOpenedAt: Math.max(0, Number(parsed.lastOpenedAt)) };
+  } catch {
+    return { lastOpenedAt: 0 };
+  }
+}
+
+function persistChatPersistedState(): void {
+  window.localStorage.setItem(CHAT_STATE_STORAGE_KEY, JSON.stringify(chatState));
+}
+
+function getDailyReportText(): string {
+  const now = new Date();
+  const dayKey = getLocalDayKey(now);
+  const averageStat =
+    (state.stats.hunger + state.stats.happiness + state.stats.cleanliness + state.stats.health) / 4;
+  const effortScore = state.actionCounts.feed + state.actionCounts.clean + state.actionCounts.play;
+  const encouragement =
+    averageStat >= 80
+      ? '오늘은 안정적으로 잘 돌봤어요. 이 흐름을 그대로 유지해봐요.'
+      : averageStat >= 60
+        ? '조금만 더 관리하면 컨디션이 더 좋아질 수 있어요.'
+        : '내일은 Feed/Clean/Play를 더 자주 눌러서 회복에 집중해봐요.';
+  return (
+    `[${dayKey}] Stage ${state.stage} · EXP ${state.exp}\n` +
+    `스탯 평균 ${Math.round(averageStat)}점 · 행동 ${effortScore}회\n` +
+    `활동 EXP 자동 ${activitySnapshot.dailyActivityExp}, 수동 ${activitySnapshot.dailyFallbackExp}\n` +
+    encouragement
+  );
+}
+
+function updateReportButtonVisibility(): void {
+  const hasPending = Boolean(pendingDailyReport && !pendingDailyReport.viewed);
+  reportButton.classList.toggle('hidden', !hasPending);
+}
+
+function openPendingReport(): void {
+  if (!pendingDailyReport || pendingDailyReport.viewed) {
+    updateReportButtonVisibility();
+    return;
+  }
+  window.alert(pendingDailyReport.summary);
+  pendingDailyReport = { ...pendingDailyReport, viewed: true };
+  persistPendingDailyReport(pendingDailyReport);
+  updateReportButtonVisibility();
+}
+
+function getChatOpenRemainingMs(nowMs: number = Date.now()): number {
+  const elapsed = nowMs - chatState.lastOpenedAt;
+  return Math.max(0, CHAT_OPEN_COOLDOWN_MS - elapsed);
+}
+
+function renderChatLog(): void {
+  chatLogElement.replaceChildren();
+  for (const message of chatMessages) {
+    const line = document.createElement('p');
+    line.className = `chat-log-line ${message.role}`;
+    line.textContent = message.role === 'user' ? `나: ${message.text}` : `펫: ${message.text}`;
+    chatLogElement.appendChild(line);
+  }
+  chatLogElement.scrollTop = chatLogElement.scrollHeight;
+}
+
+function updateChatUI(): void {
+  const remainingMs = getChatOpenRemainingMs();
+  if (!chatVisible) {
+    chatBoxElement.classList.add('hidden');
+    if (remainingMs > 0) {
+      chatOpenButton.disabled = true;
+      chatStatusElement.textContent = `대화 재오픈 ${Math.ceil(remainingMs / 1_000)}초`;
+    } else if (chatClosedByTurnLimit) {
+      chatOpenButton.disabled = false;
+      chatStatusElement.textContent = '세션 종료. 다시 대화하기를 눌러주세요.';
+    } else {
+      chatOpenButton.disabled = false;
+      chatStatusElement.textContent = '대화창 닫힘';
+    }
+    chatSendButton.disabled = true;
+    chatInputElement.disabled = true;
+    return;
+  }
+
+  chatBoxElement.classList.remove('hidden');
+  const remainTurns = Math.max(0, chatSessionMaxTurns - chatSessionUsedTurns);
+  chatStatusElement.textContent = `남은 응답 ${remainTurns}회`;
+  const disabled = remainTurns <= 0;
+  chatSendButton.disabled = disabled;
+  chatInputElement.disabled = disabled;
+}
+
+function closeChatSession(limitReached: boolean): void {
+  chatVisible = false;
+  chatClosedByTurnLimit = limitReached;
+  chatInputElement.value = '';
+  updateChatUI();
+}
+
+function openChatSession(): void {
+  if (getChatOpenRemainingMs() > 0) {
+    updateChatUI();
+    return;
+  }
+  chatVisible = true;
+  chatClosedByTurnLimit = false;
+  chatSessionMaxTurns = 3 + Math.floor(Math.random() * 3);
+  chatSessionUsedTurns = 0;
+  chatMessages = [{ role: 'pet', text: '안녕! 오늘 컨디션 기준으로 짧게 대화해볼까?' }];
+  chatState.lastOpenedAt = Date.now();
+  persistChatPersistedState();
+  renderChatLog();
+  updateChatUI();
+  chatInputElement.focus();
+}
+
+function buildChatPrompt(userText: string): string {
+  const recentDialog = chatMessages
+    .slice(-6)
+    .map((message) => `${message.role === 'user' ? 'User' : 'Pet'}: ${message.text}`)
+    .join('\n');
+  return [
+    '너는 DesktopPetOverlay의 펫 캐릭터다.',
+    '답변은 한국어로, 1~2문장, 부드럽고 짧게 작성한다.',
+    '게임 규칙: Feed/Clean/Play 액션, 활동 EXP 자동/수동 획득, 스탯은 hunger/happiness/cleanliness/health.',
+    `현재 상태: Stage=${state.stage}, EXP=${state.exp}, hunger=${Math.round(state.stats.hunger)}, happiness=${Math.round(state.stats.happiness)}, cleanliness=${Math.round(state.stats.cleanliness)}, health=${Math.round(state.stats.health)}.`,
+    `행동 횟수: feed=${state.actionCounts.feed}, clean=${state.actionCounts.clean}, play=${state.actionCounts.play}.`,
+    '다음 사용자 메시지에 대해, 게임 맥락을 반영해 자연스럽게 응답하라.',
+    `대화 기록:\n${recentDialog}`,
+    `사용자 입력: ${userText}`,
+  ].join('\n');
+}
+
+async function sendChatMessage(): Promise<void> {
+  const input = chatInputElement.value.trim();
+  if (!chatVisible || !input || chatSessionUsedTurns >= chatSessionMaxTurns) {
+    return;
+  }
+  chatInputElement.value = '';
+  chatMessages.push({ role: 'user', text: input });
+  renderChatLog();
+  updateChatUI();
+
+  if (!overlayBridge) {
+    chatMessages.push({ role: 'pet', text: '브리지를 찾지 못해서 지금은 대답할 수 없어요.' });
+    renderChatLog();
+    closeChatSession(true);
+    return;
+  }
+
+  chatSendButton.disabled = true;
+  try {
+    const response = await overlayBridge.sendPetChatPrompt(buildChatPrompt(input));
+    const answer =
+      response.ok && response.text
+        ? response.text
+        : '지금은 생각이 끊겼어. 잠시 뒤에 다시 열어서 말 걸어줘.';
+    chatMessages.push({ role: 'pet', text: answer });
+  } catch {
+    chatMessages.push({ role: 'pet', text: '네트워크가 불안정해서 답을 못 했어.' });
+  }
+  chatSessionUsedTurns += 1;
+  renderChatLog();
+  if (chatSessionUsedTurns >= chatSessionMaxTurns) {
+    chatMessages.push({ role: 'pet', text: '오늘 대화는 여기까지! 1분 뒤에 다시 열 수 있어.' });
+    renderChatLog();
+    closeChatSession(true);
+    return;
+  }
+  updateChatUI();
 }
 
 function clampCharacterSizeLevel(level: number): number {
@@ -2025,6 +2281,7 @@ function updatePanelFace(nowMs: number): void {
 }
 
 function render(nextState: PetState): void {
+  const previousStage = state.stage;
   state = nextState;
   updatePanelFace(performance.now());
   stageTextElement.textContent = `Stage: ${state.stage}`;
@@ -2049,6 +2306,9 @@ function render(nextState: PetState): void {
   renderPlayground();
   updateClickThroughUI();
   updateActivityUI();
+  if (state.stage !== previousStage && state.stage !== 'Egg') {
+    overlayHintElement.textContent = STAGE_TRANSITION_MESSAGE[state.stage];
+  }
 }
 
 function handleAction(action: 'feed' | 'clean' | 'play'): void {
@@ -2334,6 +2594,23 @@ activityCheckinButton.addEventListener('click', () => {
 });
 
 window.addEventListener('beforeunload', () => {
+  const reportSummary = getDailyReportText();
+  pendingDailyReport = {
+    dayKey: getLocalDayKey(new Date()),
+    summary: reportSummary,
+    createdAt: new Date().toISOString(),
+    viewed: false,
+  };
+  persistPendingDailyReport(pendingDailyReport);
+  const viewNow = window.confirm('오늘의 요약/격려 리포트를 지금 확인할까요?');
+  if (viewNow) {
+    window.alert(reportSummary);
+    pendingDailyReport = {
+      ...pendingDailyReport,
+      viewed: true,
+    };
+    persistPendingDailyReport(pendingDailyReport);
+  }
   if (liveLoopHandle !== 0) {
     window.cancelAnimationFrame(liveLoopHandle);
   }
@@ -2392,6 +2669,30 @@ helpButton.addEventListener('click', () => {
   helpPanelElement.classList.toggle('hidden');
 });
 
+reportButton.addEventListener('click', () => {
+  openPendingReport();
+});
+
+chatOpenButton.addEventListener('click', () => {
+  if (chatVisible) {
+    closeChatSession(false);
+    return;
+  }
+  openChatSession();
+});
+
+chatSendButton.addEventListener('click', () => {
+  void sendChatMessage();
+});
+
+chatInputElement.addEventListener('keydown', (event: KeyboardEvent) => {
+  if (event.key !== 'Enter') {
+    return;
+  }
+  event.preventDefault();
+  void sendChatMessage();
+});
+
 window.addEventListener('mousemove', (event: MouseEvent) => {
   syncPointerCaptureMode(event);
 });
@@ -2423,11 +2724,18 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 
 updateHelpPanel();
 updateCharacterSettingsUI();
+updateReportButtonVisibility();
+updateChatUI();
 syncMainMotionModeOnBoot();
 setUiPanelVisible(uiPanelVisible);
 bindActivitySignalEvents();
 render(state);
 startLiveLoop();
+setInterval(() => {
+  if (!chatVisible) {
+    updateChatUI();
+  }
+}, 1_000);
 void initializeSpritePipeline().then(() => {
   renderPlayground();
 });

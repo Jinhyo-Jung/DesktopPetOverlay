@@ -36,6 +36,7 @@ interface OverlayBridge {
   getDisplays: () => Promise<DisplayInfo[]>;
   moveToDisplay: (displayId: number) => Promise<boolean>;
   onClickThroughChanged: (callback: (state: OverlayState) => void) => () => void;
+  sendPetChatPrompt: (prompt: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
 }
 
 const overlayBridge: OverlayBridge = {
@@ -60,6 +61,12 @@ const overlayBridge: OverlayBridge = {
       ipcRenderer.removeListener('overlay:click-through-changed', listener);
     };
   },
+  sendPetChatPrompt: (prompt: string) =>
+    ipcRenderer.invoke('pet-chat:send', { prompt }) as Promise<{
+      ok: boolean;
+      text?: string;
+      error?: string;
+    }>,
 };
 
 contextBridge.exposeInMainWorld('overlayBridge', overlayBridge);

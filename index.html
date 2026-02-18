@@ -11,6 +11,19 @@
         <section id="pet-playground" class="pet-playground" aria-label="Pet playground"></section>
 
         <section id="pet-ui-panel" class="pet-ui-panel hidden" aria-label="Desktop pet controls">
+          <section class="chat-panel" aria-label="Pet chat">
+            <div class="chat-row">
+              <button id="chat-open-btn" type="button">대화하기</button>
+              <span id="chat-status" class="overlay-status">대화창 닫힘</span>
+            </div>
+            <div id="chat-box" class="chat-box hidden">
+              <div id="chat-log" class="chat-log" aria-live="polite"></div>
+              <div class="chat-input-row">
+                <input id="chat-input" type="text" maxlength="120" placeholder="메시지를 입력하세요" />
+                <button id="chat-send-btn" type="button">보내기</button>
+              </div>
+            </div>
+          </section>
           <div id="panel-drag-handle" class="panel-drag-handle" title="드래그해서 패널 이동">⋮⋮ 패널 이동</div>
           <div id="pet-face" class="pet-face" aria-hidden="true">🥚</div>
           <h1>Desktop Pet Overlay</h1>
@@ -22,6 +35,7 @@
               <button id="click-through-toggle-btn" type="button">Click-through: OFF</button>
               <button id="settings-btn" type="button" class="icon-button" title="설정">⚙</button>
               <button id="help-btn" type="button" class="icon-button" title="도움말">?</button>
+              <button id="report-btn" type="button" class="icon-button hidden" title="일일 리포트">R</button>
               <span id="click-through-status" class="overlay-status">입력 캡처 중</span>
             </div>
             <div class="overlay-row overlay-row-character">

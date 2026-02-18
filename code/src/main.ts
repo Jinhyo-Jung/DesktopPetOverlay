@@ -41,6 +41,10 @@ interface DisplayInfo {
   current: boolean;
 }
 
+interface PetChatRequest {
+  prompt: string;
+}
+
 const DEFAULT_PREFERENCES: OverlayPreferences = {
   clickThroughEnabled: false,
 };
@@ -53,6 +57,43 @@ let mainWindow: BrowserWindow | null = null;
 let overlayPreferences: OverlayPreferences = { ...DEFAULT_PREFERENCES };
 let clickThroughShortcutRegistered = false;
 let pointerCaptureEnabled = true;
+
+const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+
+const loadEnvFile = (filename: string): void => {
+  const envPath = path.join(app.getAppPath(), filename);
+  if (!fs.existsSync(envPath)) {
+    return;
+  }
+  try {
+    const raw = fs.readFileSync(envPath, 'utf-8');
+    const lines = raw.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) {
+        continue;
+      }
+      const separatorIndex = trimmed.indexOf('=');
+      if (separatorIndex <= 0) {
+        continue;
+      }
+      const key = trimmed.slice(0, separatorIndex).trim();
+      if (!key || process.env[key] !== undefined) {
+        continue;
+      }
+      const rawValue = trimmed.slice(separatorIndex + 1).trim();
+      const value = rawValue.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+      process.env[key] = value;
+    }
+  } catch {
+    // Ignore malformed env files to keep app startup resilient.
+  }
+};
+
+const loadLocalEnvironment = (): void => {
+  loadEnvFile('.env');
+  loadEnvFile('.env.local');
+};
 
 const getPreferencesPath = (): string =>
   path.join(app.getPath('userData'), 'overlay-preferences.json');
@@ -355,10 +396,54 @@ const registerIpcHandlers = (): void => {
     writeOverlayPreferences();
     return true;
   });
+
+  ipcMain.handle('pet-chat:send', async (_event, payload: unknown) => {
+    const request = payload as PetChatRequest | null;
+    const prompt = request && typeof request.prompt === 'string' ? request.prompt.trim() : '';
+    if (!prompt) {
+      return { ok: false, error: 'empty-prompt' };
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      return { ok: false, error: 'missing-api-key' };
+    }
+
+    try {
+      const response = await fetch(`${OPENAI_BASE_URL}/responses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini',
+          input: prompt,
+          max_output_tokens: 220,
+        }),
+      });
+
+      if (!response.ok) {
+        return { ok: false, error: `openai-${response.status}` };
+      }
+
+      const data = (await response.json()) as {
+        output_text?: unknown;
+      };
+      const text = typeof data.output_text === 'string' ? data.output_text.trim() : '';
+      if (!text) {
+        return { ok: false, error: 'empty-response' };
+      }
+      return { ok: true, text };
+    } catch {
+      return { ok: false, error: 'network-failed' };
+    }
+  });
 };
 
 app.on('ready', () => {
   app.setAppUserModelId(APP_USER_MODEL_ID);
+  loadLocalEnvironment();
   overlayPreferences = readOverlayPreferences();
   clampWindowPosition();
   registerIpcHandlers();

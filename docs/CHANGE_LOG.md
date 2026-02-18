@@ -1,3 +1,12 @@
+## 2026-02-18T15:59:35+09:00
+- 결론: 성장 단계 전환 메시지, 일일 요약/격려 리포트, OpenAI 기반 펫 대화 기능을 기준서와 함께 코드로 통합했다.
+- `code/src/renderer.ts`, `index.html`, `code/src/index.css`를 갱신해 패널 최상단 `대화하기` UI와 대화 로그/입력창을 추가하고, 세션당 응답 3~5회 제한 및 재오픈 1분 쿨다운 로직을 구현했다.
+- 단계 전환(`Baby`/`Teen`/`Adult`) 시 고정 이벤트 메시지를 표시하도록 렌더러 렌더링 경로에 전환 감지 로직을 추가했다.
+- 앱 종료 시 일일 요약/격려 리포트를 저장하고 즉시 열람 여부를 confirm으로 묻도록 구현했으며, 다음 실행 시 `?` 오른쪽 `R` 버튼으로 1회 열람 후 버튼이 숨겨지게 했다.
+- OpenAI 호출 경로를 `code/src/preload.ts` 브리지 + `code/src/main.ts` IPC(`pet-chat:send`)로 추가하고, API 키는 환경변수(`OPENAI_API_KEY`) 기반으로만 읽도록 구현했다.
+- `code/src/main.ts`에 `.env`/`.env.local` 로더를 추가했고, `.gitignore`와 `.env.example`을 갱신해 키가 GitHub에 업로드되지 않도록 기본 구성을 보강했다.
+- 기능 변경에 맞춰 기준서 `docs/specs/DesktopPetOverlay-실구현-기능-기준서.md`를 같은 커밋에서 갱신했다.
+
 ## 2026-02-18T15:34:03+09:00
 - 성장 단계 폴더에서 변형 감정 이미지(`*_01`, `*_02`, `*_03`)가 누락된 경우 같은 단계의 기본 감정 이미지로 자동 대체하도록 스프라이트 상태 해석 로직을 보강했다.
 - `code/src/renderer.ts`의 `resolveSpriteStates`에 감정 프레임 해석 함수(`resolveEmotionFrameWithFallback`)를 추가해 `happy_01` 누락 시 `happy`, `dirty_03` 누락 시 `dirty`를 사용하도록 처리했다.
