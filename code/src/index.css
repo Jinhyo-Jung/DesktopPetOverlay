@@ -122,6 +122,10 @@ body {
   align-items: center;
 }
 
+.chat-row.chat-row-key {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .chat-box.hidden {
   display: none;
 }
@@ -163,6 +167,41 @@ body {
   padding: 7px 8px;
   background: #fffdf4;
   font-size: 12px;
+}
+
+.openai-key-panel {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #dccf9f;
+  border-radius: 10px;
+  background: #fffdf5;
+  padding: 8px;
+}
+
+.openai-key-panel label {
+  font-size: 11px;
+  color: #4a4a4a;
+}
+
+.openai-key-panel input {
+  min-width: 0;
+  border: 1px solid #d3c58a;
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: #fffdf4;
+  font-size: 12px;
+}
+
+.openai-key-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.openai-key-help {
+  margin: 0;
+  font-size: 11px;
+  color: #6a6a6a;
 }
 
 .pet-ui-panel.hidden {

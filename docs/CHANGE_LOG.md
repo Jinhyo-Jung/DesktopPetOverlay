@@ -1,3 +1,10 @@
+## 2026-02-18T18:16:30+09:00
+- 결론: OpenAI API 키를 앱 내부 GUI로 입력/저장/삭제할 수 있게 하고, 키가 없으면 대화 기능을 명확히 비활성화했다.
+- `index.html`, `code/src/index.css`, `code/src/renderer.ts`에 API 키 설정 패널을 추가해 상태 표시(미설정/설정됨), 저장/삭제 동작을 제공하고 키 미설정 시 `대화하기` 버튼을 비활성화한다.
+- `code/src/main.ts`에 `userData/openai-config.json` 저장소와 IPC(`openai:get-status`, `openai:set-config`, `openai:clear-config`)를 추가해 렌더러가 키를 안전하게 설정할 수 있게 했다.
+- `code/src/preload.ts`에 브리지(`getOpenAiStatus`, `setOpenAiConfig`, `clearOpenAiConfig`)를 추가해 렌더러가 직접 파일/환경변수에 접근하지 않도록 구성했다.
+- 기능 기준서(`docs/specs/DesktopPetOverlay-실구현-기능-기준서.md`)의 OpenAI 키 로딩 규칙을 앱 설정 지원으로 갱신했다.
+
 ## 2026-02-18T17:57:49+09:00
 - 결론: 아이디어 소개 문서에 예상 고객과 문제-해결 정의를 최대 3개로 구체화했다.
 - `docs/프로젝트 아이디어 소개.md`에 고객 유형별(지식근로자, 학생/취준생, 게임형 습관 관리 선호 사용자) 문제점과 해결 방식을 추가해 제안서 활용성을 높였다.

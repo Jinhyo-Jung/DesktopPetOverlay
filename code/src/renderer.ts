@@ -53,6 +53,15 @@ interface OverlayBridge {
   requestClose: () => Promise<boolean>;
   confirmClose: () => Promise<boolean>;
   onCloseRequested: (callback: () => void) => () => void;
+  getOpenAiStatus: () => Promise<{ hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string }>;
+  setOpenAiConfig: (payload: { apiKey: string; model?: string }) => Promise<{
+    ok: boolean;
+    status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+  }>;
+  clearOpenAiConfig: () => Promise<{
+    ok: boolean;
+    status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+  }>;
 }
 
 interface DisplayInfo {
@@ -312,6 +321,13 @@ const chatBoxElement = document.getElementById('chat-box') as HTMLElement;
 const chatLogElement = document.getElementById('chat-log') as HTMLElement;
 const chatInputElement = document.getElementById('chat-input') as HTMLInputElement;
 const chatSendButton = document.getElementById('chat-send-btn') as HTMLButtonElement;
+const openAiKeyToggleButton = document.getElementById('openai-key-toggle-btn') as HTMLButtonElement;
+const openAiKeyStatusElement = document.getElementById('openai-key-status') as HTMLElement;
+const openAiKeyPanelElement = document.getElementById('openai-key-panel') as HTMLElement;
+const openAiApiKeyInputElement = document.getElementById('openai-api-key-input') as HTMLInputElement;
+const openAiModelInputElement = document.getElementById('openai-model-input') as HTMLInputElement;
+const openAiKeySaveButton = document.getElementById('openai-key-save-btn') as HTMLButtonElement;
+const openAiKeyClearButton = document.getElementById('openai-key-clear-btn') as HTMLButtonElement;
 
 let state: PetState = loadState();
 let clickThroughEnabled = false;
@@ -353,6 +369,12 @@ let chatClosedByTurnLimit = false;
 let chatSessionMaxTurns = 0;
 let chatSessionUsedTurns = 0;
 let chatMessages: ChatMessage[] = [];
+let openAiStatus: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string } = {
+  hasApiKey: false,
+  source: 'none',
+  model: 'gpt-4o-mini',
+};
+let openAiKeyPanelVisible = false;
 let closeHandled = false;
 
 const overlayBridge = window.overlayBridge;
@@ -539,6 +561,13 @@ function updateChatUI(): void {
   const remainingMs = getChatOpenRemainingMs();
   if (!chatVisible) {
     chatBoxElement.classList.add('hidden');
+    if (!openAiStatus.hasApiKey) {
+      chatOpenButton.disabled = true;
+      chatStatusElement.textContent = 'API 키가 필요합니다. (API 키 설정을 눌러 등록)';
+      chatSendButton.disabled = true;
+      chatInputElement.disabled = true;
+      return;
+    }
     if (remainingMs > 0) {
       chatOpenButton.disabled = true;
       chatStatusElement.textContent = `대화 재오픈 ${Math.ceil(remainingMs / 1_000)}초`;
@@ -562,6 +591,32 @@ function updateChatUI(): void {
   chatInputElement.disabled = disabled;
 }
 
+function updateOpenAiKeyUI(): void {
+  openAiKeyPanelElement.classList.toggle('hidden', !openAiKeyPanelVisible);
+  const sourceLabel =
+    openAiStatus.source === 'config' ? '앱 저장' : openAiStatus.source === 'env' ? '환경변수' : '없음';
+  openAiKeyStatusElement.textContent = openAiStatus.hasApiKey
+    ? `설정됨 (${sourceLabel}) · model ${openAiStatus.model}`
+    : '미설정 · 대화 기능을 사용하려면 키가 필요합니다.';
+  openAiKeyClearButton.disabled = openAiStatus.source !== 'config';
+}
+
+async function refreshOpenAiStatus(): Promise<void> {
+  if (!overlayBridge) {
+    openAiStatus = { hasApiKey: false, source: 'none', model: 'gpt-4o-mini' };
+    updateOpenAiKeyUI();
+    updateChatUI();
+    return;
+  }
+  try {
+    openAiStatus = await overlayBridge.getOpenAiStatus();
+  } catch {
+    openAiStatus = { hasApiKey: false, source: 'none', model: 'gpt-4o-mini' };
+  }
+  updateOpenAiKeyUI();
+  updateChatUI();
+}
+
 function closeChatSession(limitReached: boolean): void {
   chatVisible = false;
   chatClosedByTurnLimit = limitReached;
@@ -572,6 +627,13 @@ function closeChatSession(limitReached: boolean): void {
 function openChatSession(): void {
   if (getChatOpenRemainingMs() > 0) {
     updateChatUI();
+    return;
+  }
+  if (!openAiStatus.hasApiKey) {
+    openAiKeyPanelVisible = true;
+    updateOpenAiKeyUI();
+    updateChatUI();
+    overlayHintElement.textContent = 'OpenAI API 키를 설정하면 대화 기능을 사용할 수 있습니다.';
     return;
   }
   chatVisible = true;
@@ -628,6 +690,10 @@ async function sendChatMessage(): Promise<void> {
         ? response.text
         : `지금은 답변을 만들지 못했어. (${response.error ?? 'unknown'})`;
     chatMessages.push({ role: 'pet', text: answer });
+    if (!response.ok && response.error === 'missing-api-key') {
+      openAiKeyPanelVisible = true;
+      void refreshOpenAiStatus();
+    }
   } catch {
     chatMessages.push({ role: 'pet', text: '네트워크가 불안정해서 답을 못 했어.' });
   }
@@ -2720,6 +2786,51 @@ chatOpenButton.addEventListener('click', () => {
   openChatSession();
 });
 
+openAiKeyToggleButton.addEventListener('click', () => {
+  openAiKeyPanelVisible = !openAiKeyPanelVisible;
+  updateOpenAiKeyUI();
+});
+
+openAiKeySaveButton.addEventListener('click', async () => {
+  if (!overlayBridge) {
+    overlayHintElement.textContent = '브리지를 찾지 못해 API 키를 저장할 수 없습니다.';
+    return;
+  }
+  const apiKey = openAiApiKeyInputElement.value.trim();
+  const model = openAiModelInputElement.value.trim();
+  if (!apiKey) {
+    overlayHintElement.textContent = 'API 키를 입력해주세요.';
+    return;
+  }
+  const result = await overlayBridge.setOpenAiConfig({ apiKey, model: model || undefined });
+  if (result.ok) {
+    openAiApiKeyInputElement.value = '';
+    openAiModelInputElement.value = '';
+    openAiStatus = result.status;
+    openAiKeyPanelVisible = false;
+    updateOpenAiKeyUI();
+    updateChatUI();
+    overlayHintElement.textContent = 'OpenAI API 키 저장 완료. 이제 대화하기를 사용할 수 있습니다.';
+  } else {
+    overlayHintElement.textContent = 'API 키 저장에 실패했습니다.';
+  }
+});
+
+openAiKeyClearButton.addEventListener('click', async () => {
+  if (!overlayBridge) {
+    return;
+  }
+  const confirmed = window.confirm('저장된 OpenAI API 키를 삭제합니다. 계속하시겠습니까?');
+  if (!confirmed) {
+    return;
+  }
+  const result = await overlayBridge.clearOpenAiConfig();
+  openAiStatus = result.status;
+  updateOpenAiKeyUI();
+  updateChatUI();
+  overlayHintElement.textContent = result.ok ? 'OpenAI API 키를 삭제했습니다.' : 'API 키 삭제에 실패했습니다.';
+});
+
 chatSendButton.addEventListener('click', () => {
   void sendChatMessage();
 });
@@ -2764,6 +2875,7 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 updateHelpPanel();
 updateCharacterSettingsUI();
 updateReportButtonVisibility();
+void refreshOpenAiStatus();
 updateChatUI();
 syncMainMotionModeOnBoot();
 setUiPanelVisible(uiPanelVisible);

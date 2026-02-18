@@ -40,6 +40,15 @@ interface OverlayBridge {
   requestClose: () => Promise<boolean>;
   confirmClose: () => Promise<boolean>;
   onCloseRequested: (callback: () => void) => () => void;
+  getOpenAiStatus: () => Promise<{ hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string }>;
+  setOpenAiConfig: (payload: { apiKey: string; model?: string }) => Promise<{
+    ok: boolean;
+    status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+  }>;
+  clearOpenAiConfig: () => Promise<{
+    ok: boolean;
+    status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+  }>;
 }
 
 const overlayBridge: OverlayBridge = {
@@ -81,6 +90,21 @@ const overlayBridge: OverlayBridge = {
       ipcRenderer.removeListener('app:close-requested', listener);
     };
   },
+  getOpenAiStatus: () => ipcRenderer.invoke('openai:get-status') as Promise<{
+    hasApiKey: boolean;
+    source: 'config' | 'env' | 'none';
+    model: string;
+  }>,
+  setOpenAiConfig: (payload: { apiKey: string; model?: string }) =>
+    ipcRenderer.invoke('openai:set-config', payload) as Promise<{
+      ok: boolean;
+      status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+    }>,
+  clearOpenAiConfig: () =>
+    ipcRenderer.invoke('openai:clear-config') as Promise<{
+      ok: boolean;
+      status: { hasApiKey: boolean; source: 'config' | 'env' | 'none'; model: string };
+    }>,
 };
 
 contextBridge.exposeInMainWorld('overlayBridge', overlayBridge);

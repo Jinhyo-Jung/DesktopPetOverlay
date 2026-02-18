@@ -45,6 +45,17 @@ interface PetChatRequest {
   prompt: string;
 }
 
+interface OpenAiConfig {
+  apiKey?: string;
+  model?: string;
+}
+
+interface OpenAiStatus {
+  hasApiKey: boolean;
+  source: 'config' | 'env' | 'none';
+  model: string;
+}
+
 interface CloseFlowState {
   requested: boolean;
 }
@@ -64,6 +75,80 @@ let pointerCaptureEnabled = true;
 const closeFlowState: CloseFlowState = { requested: false };
 
 const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
+
+const getOpenAiConfigPath = (): string =>
+  path.join(app.getPath('userData'), 'openai-config.json');
+
+const readOpenAiConfig = (): OpenAiConfig => {
+  try {
+    const raw = fs.readFileSync(getOpenAiConfigPath(), 'utf-8');
+    const parsed = JSON.parse(raw) as Partial<OpenAiConfig>;
+    const apiKey = typeof parsed.apiKey === 'string' ? parsed.apiKey.trim() : '';
+    const model = typeof parsed.model === 'string' ? parsed.model.trim() : '';
+    const config: OpenAiConfig = {};
+    if (apiKey) {
+      config.apiKey = apiKey;
+    }
+    if (model) {
+      config.model = model;
+    }
+    return config;
+  } catch {
+    return {};
+  }
+};
+
+const writeOpenAiConfig = (next: OpenAiConfig): boolean => {
+  try {
+    fs.writeFileSync(getOpenAiConfigPath(), JSON.stringify(next, null, 2), 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const clearOpenAiConfig = (): boolean => {
+  try {
+    fs.rmSync(getOpenAiConfigPath(), { force: true });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const resolveOpenAiAuth = (): { apiKey: string | null; source: 'config' | 'env' | 'none' } => {
+  const configKey = readOpenAiConfig().apiKey?.trim();
+  if (configKey) {
+    return { apiKey: configKey, source: 'config' };
+  }
+  const envKey = process.env.OPENAI_API_KEY?.trim();
+  if (envKey) {
+    return { apiKey: envKey, source: 'env' };
+  }
+  return { apiKey: null, source: 'none' };
+};
+
+const resolveOpenAiModel = (): string => {
+  const configModel = readOpenAiConfig().model?.trim();
+  if (configModel) {
+    return configModel;
+  }
+  const envModel = process.env.OPENAI_MODEL?.trim();
+  if (envModel) {
+    return envModel;
+  }
+  return DEFAULT_OPENAI_MODEL;
+};
+
+const getOpenAiStatus = (): OpenAiStatus => {
+  const resolved = resolveOpenAiAuth();
+  return {
+    hasApiKey: Boolean(resolved.apiKey),
+    source: resolved.source,
+    model: resolveOpenAiModel(),
+  };
+};
 
 const loadEnvFile = (filename: string): void => {
   const envPath = path.join(app.getAppPath(), filename);
@@ -427,6 +512,28 @@ const registerIpcHandlers = (): void => {
     return true;
   });
 
+  ipcMain.handle('openai:get-status', () => getOpenAiStatus());
+
+  ipcMain.handle('openai:set-config', (_event, payload: unknown) => {
+    const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+    const apiKey = typeof record.apiKey === 'string' ? record.apiKey.trim() : '';
+    const model = typeof record.model === 'string' ? record.model.trim() : '';
+    const next: OpenAiConfig = {};
+    if (apiKey) {
+      next.apiKey = apiKey;
+    }
+    if (model) {
+      next.model = model;
+    }
+    const ok = writeOpenAiConfig(next);
+    return { ok, status: getOpenAiStatus() };
+  });
+
+  ipcMain.handle('openai:clear-config', () => {
+    const ok = clearOpenAiConfig();
+    return { ok, status: getOpenAiStatus() };
+  });
+
   ipcMain.handle('pet-chat:send', async (_event, payload: unknown) => {
     const request = payload as PetChatRequest | null;
     const prompt = request && typeof request.prompt === 'string' ? request.prompt.trim() : '';
@@ -434,8 +541,8 @@ const registerIpcHandlers = (): void => {
       return { ok: false, error: 'empty-prompt' };
     }
 
-    const apiKey = process.env.OPENAI_API_KEY?.trim();
-    if (!apiKey) {
+    const resolved = resolveOpenAiAuth();
+    if (!resolved.apiKey) {
       return { ok: false, error: 'missing-api-key' };
     }
 
@@ -444,10 +551,10 @@ const registerIpcHandlers = (): void => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${resolved.apiKey}`,
         },
         body: JSON.stringify({
-          model: process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini',
+          model: resolveOpenAiModel(),
           input: prompt,
           max_output_tokens: 220,
         }),
