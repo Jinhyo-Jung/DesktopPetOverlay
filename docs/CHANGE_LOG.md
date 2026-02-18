@@ -1,3 +1,9 @@
+## 2026-02-18T17:26:30+09:00
+- 결론: 앱 시작 직후 기본 `Egg` 이미지가 잠깐 보이던 플래시를 제거하고, 로딩 전에도 마지막 저장 캐릭터 단계가 먼저 보이도록 수정했다.
+- `index.html`에 초기 부트스트랩 스크립트를 추가해 `desktop-pet-overlay-save`의 `stage`를 즉시 읽고 패널 얼굴(`pet-face`), 스테이지 텍스트(`stage-text`), 임시 캐릭터 프리뷰를 먼저 렌더링하도록 반영했다.
+- 이후 `renderer.ts`가 로드되면 기존 렌더 파이프라인이 동일하게 takeover하여 실제 상태/스프라이트로 교체된다.
+- 기능 기준서(`docs/specs/DesktopPetOverlay-실구현-기능-기준서.md`)에 로딩 전 단계 프리뷰 반영 동작을 추가했다.
+
 ## 2026-02-18T17:06:53+09:00
 - 결론: 감정 키워드 `tired`(및 오타 `tierd`)를 `sick`으로 통일하고, 에셋/스프라이트/런타임 참조를 일괄 정리했다.
 - `source/pet_emotions/main_cat/*`에서 `tired*.png`, `tierd*.png` 파일명을 `sick*.png`로 변경했다.

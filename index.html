@@ -25,7 +25,7 @@
             </div>
           </section>
           <div id="panel-drag-handle" class="panel-drag-handle" title="드래그해서 패널 이동">⋮⋮ 패널 이동</div>
-          <div id="pet-face" class="pet-face" aria-hidden="true">🥚</div>
+          <div id="pet-face" class="pet-face" aria-hidden="true">🐣</div>
           <h1>Desktop Pet Overlay</h1>
           <p id="stage-text" class="stage-text">Stage: Egg</p>
           <p id="warning-text" class="warning-text">상태 양호</p>
@@ -136,6 +136,49 @@
         </section>
       </section>
     </main>
+    <script>
+      (() => {
+        const STAGE_FACE_MAP = {
+          Egg: '🐣',
+          Baby: '🐥',
+          Teen: '🐱',
+          Adult: '🐈',
+        };
+        const stageTextEl = document.getElementById('stage-text');
+        const faceEl = document.getElementById('pet-face');
+        const playgroundEl = document.getElementById('pet-playground');
+        try {
+          const raw = window.localStorage.getItem('desktop-pet-overlay-save');
+          const parsed = raw ? JSON.parse(raw) : null;
+          const savedStage =
+            parsed && typeof parsed.stage === 'string' && STAGE_FACE_MAP[parsed.stage]
+              ? parsed.stage
+              : 'Egg';
+          if (stageTextEl) {
+            stageTextEl.textContent = `Stage: ${savedStage}`;
+          }
+          if (faceEl) {
+            faceEl.textContent = STAGE_FACE_MAP[savedStage];
+          }
+          if (playgroundEl) {
+            const preview = document.createElement('button');
+            const size = 88;
+            const x = Math.max(8, window.innerWidth - size - 48);
+            const y = Math.max(8, window.innerHeight - size - 16);
+            preview.type = 'button';
+            preview.className = 'playground-pet main';
+            preview.style.left = `${x}px`;
+            preview.style.top = `${y}px`;
+            preview.setAttribute('aria-hidden', 'true');
+            preview.tabIndex = -1;
+            preview.textContent = STAGE_FACE_MAP[savedStage];
+            playgroundEl.appendChild(preview);
+          }
+        } catch {
+          // Keep fallback UI.
+        }
+      })();
+    </script>
     <script type="module" src="/code/src/renderer.ts"></script>
   </body>
 </html>
