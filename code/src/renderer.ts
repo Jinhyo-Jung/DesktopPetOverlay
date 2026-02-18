@@ -326,6 +326,7 @@ const chatBoxElement = document.getElementById('chat-box') as HTMLElement;
 const chatLogElement = document.getElementById('chat-log') as HTMLElement;
 const chatInputElement = document.getElementById('chat-input') as HTMLInputElement;
 const chatSendButton = document.getElementById('chat-send-btn') as HTMLButtonElement;
+const openAiKeyRowElement = document.getElementById('openai-key-row') as HTMLElement;
 const openAiKeyToggleButton = document.getElementById('openai-key-toggle-btn') as HTMLButtonElement;
 const openAiKeyStatusElement = document.getElementById('openai-key-status') as HTMLElement;
 const openAiKeyPanelElement = document.getElementById('openai-key-panel') as HTMLElement;
@@ -599,6 +600,10 @@ function updateChatUI(): void {
 }
 
 function updateOpenAiKeyUI(): void {
+  if (!openAiKeySetupUnlocked) {
+    openAiKeyPanelVisible = false;
+  }
+  openAiKeyRowElement.classList.toggle('hidden', !openAiKeySetupUnlocked);
   openAiKeyPanelElement.classList.toggle('hidden', !openAiKeyPanelVisible);
   const sourceLabel = openAiStatus.source === 'config' ? '앱 저장' : '없음';
   openAiKeyStatusElement.textContent = openAiStatus.hasApiKey
@@ -633,6 +638,16 @@ function closeChatSession(limitReached: boolean): void {
   chatVisible = false;
   chatClosedByTurnLimit = limitReached;
   chatInputElement.value = '';
+  updateChatUI();
+}
+
+function collapseChatPanel(): void {
+  chatVisible = false;
+  chatClosedByTurnLimit = false;
+  chatInputElement.value = '';
+  openAiKeyPanelVisible = false;
+  openAiKeySetupUnlocked = false;
+  updateOpenAiKeyUI();
   updateChatUI();
 }
 
@@ -2792,8 +2807,9 @@ reportButton.addEventListener('click', () => {
 });
 
 chatOpenButton.addEventListener('click', () => {
-  if (chatVisible) {
-    closeChatSession(false);
+  const expanded = chatVisible || openAiKeySetupUnlocked || openAiKeyPanelVisible;
+  if (expanded) {
+    collapseChatPanel();
     return;
   }
   openChatSession();
