@@ -117,13 +117,23 @@ body {
 
 .chat-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 6px;
   align-items: center;
 }
 
 .chat-row.chat-row-key {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+#chat-open-btn,
+#openai-key-toggle-btn {
+  min-width: 92px;
+  white-space: nowrap;
+}
+
+.chat-row .overlay-status {
+  overflow-wrap: anywhere;
 }
 
 .chat-box.hidden {
