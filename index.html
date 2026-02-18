@@ -150,10 +150,17 @@
         try {
           const raw = window.localStorage.getItem('desktop-pet-overlay-save');
           const parsed = raw ? JSON.parse(raw) : null;
-          const savedStage =
-            parsed && typeof parsed.stage === 'string' && STAGE_FACE_MAP[parsed.stage]
-              ? parsed.stage
-              : 'Egg';
+          const exp =
+            parsed && Number.isFinite(Number(parsed.exp)) ? Math.max(0, Math.floor(Number(parsed.exp))) : 0;
+          let derivedStage = 'Egg';
+          if (exp >= 180) {
+            derivedStage = 'Adult';
+          } else if (exp >= 90) {
+            derivedStage = 'Teen';
+          } else if (exp >= 30) {
+            derivedStage = 'Baby';
+          }
+          const savedStage = derivedStage;
           if (stageTextEl) {
             stageTextEl.textContent = `Stage: ${savedStage}`;
           }
