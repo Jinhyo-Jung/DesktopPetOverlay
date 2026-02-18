@@ -4,20 +4,25 @@
   "defaultFps": 8,
   "hitAlphaThreshold": 24,
   "frameImages": [
-    { "id": "happy", "image": "source/pet_emotions/main_cat/adult/happy.png" },
-    { "id": "happy_01", "image": "source/pet_emotions/main_cat/adult/happy_01.png" },
-    { "id": "happy_02", "image": "source/pet_emotions/main_cat/adult/happy_02.png" },
-    { "id": "happy_03", "image": "source/pet_emotions/main_cat/adult/happy_03.png" },
-    { "id": "neutral", "image": "source/pet_emotions/main_cat/adult/neutral.png" },
-    { "id": "neutral_01", "image": "source/pet_emotions/main_cat/adult/neutral_01.png" },
-    { "id": "neutral_02", "image": "source/pet_emotions/main_cat/adult/neutral_02.png" },
-    { "id": "neutral_03", "image": "source/pet_emotions/main_cat/adult/neutral_03.png" },
-    { "id": "sleep", "image": "source/pet_emotions/main_cat/adult/sleep.png" },
-    { "id": "sleep_01", "image": "source/pet_emotions/main_cat/adult/sleep_01.png" },
-    { "id": "sleep_02", "image": "source/pet_emotions/main_cat/adult/sleep_02.png" },
-    { "id": "sleep_03", "image": "source/pet_emotions/main_cat/adult/sleep_03.png" },
-    { "id": "tired", "image": "source/pet_emotions/main_cat/adult/tired.png" },
-    { "id": "tired_01", "image": "source/pet_emotions/main_cat/adult/tired_01.png" }
+    { "id": "happy", "image": "source/pet_emotions/main_cat/teen/happy.png" },
+    { "id": "happy_01", "image": "source/pet_emotions/main_cat/teen/happy_01.png" },
+    { "id": "happy_02", "image": "source/pet_emotions/main_cat/teen/happy_02.png" },
+    { "id": "happy_03", "image": "source/pet_emotions/main_cat/teen/happy_03.png" },
+    { "id": "neutral", "image": "source/pet_emotions/main_cat/teen/neutral.png" },
+    { "id": "neutral_01", "image": "source/pet_emotions/main_cat/teen/neutral_01.png" },
+    { "id": "neutral_02", "image": "source/pet_emotions/main_cat/teen/neutral_02.png" },
+    { "id": "neutral_03", "image": "source/pet_emotions/main_cat/teen/neutral_03.png" },
+    { "id": "sleep", "image": "source/pet_emotions/main_cat/teen/sleep.png" },
+    { "id": "sleep_01", "image": "source/pet_emotions/main_cat/teen/sleep_01.png" },
+    { "id": "sleep_02", "image": "source/pet_emotions/main_cat/teen/sleep_02.png" },
+    { "id": "sleep_03", "image": "source/pet_emotions/main_cat/teen/sleep_03.png" },
+    { "id": "tired", "image": "source/pet_emotions/main_cat/teen/tired.png" },
+    { "id": "tired_01", "image": "source/pet_emotions/main_cat/teen/tired_01.png" },
+    { "id": "tired_02", "image": "source/pet_emotions/main_cat/teen/tired_02.png" },
+    { "id": "dirty", "image": "source/pet_emotions/main_cat/teen/dirty.png" },
+    { "id": "dirty_01", "image": "source/pet_emotions/main_cat/teen/dirty_01.png" },
+    { "id": "dirty_02", "image": "source/pet_emotions/main_cat/teen/dirty_02.png" },
+    { "id": "dirty_03", "image": "source/pet_emotions/main_cat/teen/dirty_03.png" }
   ],
   "states": {
     "idle": {
@@ -35,7 +40,12 @@
         "sleep_02",
         "sleep_03",
         "tired",
-        "tired_01"
+        "tired_01",
+        "tired_02",
+        "dirty",
+        "dirty_01",
+        "dirty_02",
+        "dirty_03"
       ],
       "fps": 2,
       "loop": true
@@ -49,17 +59,21 @@
         "neutral",
         "neutral_01",
         "neutral_02",
-        "neutral_03"
+        "neutral_03",
+        "dirty",
+        "dirty_01",
+        "dirty_02",
+        "dirty_03"
       ],
       "fps": 6,
       "loop": true
     },
     "jump": {
-      "emotions": ["happy", "happy_01", "happy_02", "happy_03", "neutral", "neutral_01", "neutral_02", "neutral_03"],
+      "emotions": ["happy", "happy_01", "happy_02", "happy_03", "neutral", "neutral_01", "neutral_02", "neutral_03", "dirty", "dirty_01", "dirty_02", "dirty_03"],
       "fps": 7,
       "loop": false
     },
-    "fall": { "emotions": ["tired", "tired_01", "sleep", "sleep_01", "sleep_02", "sleep_03"], "fps": 6, "loop": true },
-    "drag": { "emotions": ["neutral", "neutral_01", "neutral_02", "neutral_03"], "fps": 1, "loop": true }
+    "fall": { "emotions": ["tired", "tired_01", "tired_02", "sleep", "sleep_01", "sleep_02", "sleep_03", "dirty", "dirty_01", "dirty_02", "dirty_03"], "fps": 6, "loop": true },
+    "drag": { "emotions": ["neutral", "neutral_01", "neutral_02", "neutral_03", "dirty", "dirty_01", "dirty_02", "dirty_03"], "fps": 1, "loop": true }
   }
 }

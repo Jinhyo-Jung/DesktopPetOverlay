@@ -1,3 +1,23 @@
+## 2026-02-18T15:34:03+09:00
+- 성장 단계 폴더에서 변형 감정 이미지(`*_01`, `*_02`, `*_03`)가 누락된 경우 같은 단계의 기본 감정 이미지로 자동 대체하도록 스프라이트 상태 해석 로직을 보강했다.
+- `code/src/renderer.ts`의 `resolveSpriteStates`에 감정 프레임 해석 함수(`resolveEmotionFrameWithFallback`)를 추가해 `happy_01` 누락 시 `happy`, `dirty_03` 누락 시 `dirty`를 사용하도록 처리했다.
+- 기능 기준서(`docs/specs/DesktopPetOverlay-실구현-기능-기준서.md`)에 누락 변형 이미지의 기본 이미지 자동 대체 규칙을 반영했다.
+- 검증으로 npm run lint를 실행해 통과했다.
+
+## 2026-02-18T15:31:49+09:00
+- stage가 Baby인데 Teen 이미지를 표시하던 문제를 수정했다.
+- code/src/renderer.ts에서 메인 캐릭터가 현재 성장 단계 프로필을 찾지 못했을 때 다른 단계 프로필로 폴백하지 않도록 변경했다.
+- 이 변경으로 Baby 단계에서 Teen 이미지가 섞여 보이는 회귀를 차단했고, 단계 프로필이 없을 때는 스프라이트 대신 기본 이모지 렌더링으로 안전하게 처리된다.
+- 검증으로 npm run lint를 실행해 통과했다.
+
+## 2026-02-18T15:24:52+09:00
+- Egg 단계에서 source/pet_emotions/main_cat/egg를 참조하지 않던 문제를 수정했다. code/src/renderer.ts에서 Egg 전용 스프라이트 프로필(main-cat-egg)을 로드/선택하도록 변경했다.
+- 성장 단계별 프로필 로더를 보강해 egg/baby/teen 폴더를 공통 규칙으로 파생 로드하고, 일부 이미지가 비어 있어도 존재하는 프레임만으로 프로필을 구성하도록 수정했다.
+- source/pet_emotions/main_cat/egg 및 source/pet_emotions/main_cat/baby 파일명을 표준 규칙(happy, neutral, sleep, tired, dirty, *_01)으로 정규화했다.
+- 청결도 60 이하 dirty 규칙을 유지하기 위해 source/pet_sprites/main_cat.json에 dirty, dirty_01~03, tired_02 프레임 매핑을 반영했다.
+- 점검 결과: teen은 누락 없음, egg/baby/adult는 표준 파일셋 대비 누락이 남아 있어 추가 보강이 필요함을 확인했다.
+- 검증으로 npm run lint를 실행해 통과했다.
+
 ## 2026-02-18T15:17:32+09:00
 - 현재 코드 구현 기준 기능을 고정하기 위해 docs/specs/DesktopPetOverlay-실구현-기능-기준서.md를 신규 추가하고, 오버레이/모니터/캐릭터 모션/육성/저장/활동 EXP/초기화 동작을 기준 명세로 문서화했다.
 - AGENTS.md에 기능 변경 작업 시 기준서 선확인 및 변경 시 동시 갱신 규칙을 추가해, 이후 대화에서도 기준 문서 기반 검증이 강제되도록 정리했다.

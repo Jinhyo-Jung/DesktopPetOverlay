@@ -23,6 +23,7 @@
 ### 3) 메인 캐릭터/보조 캐릭터 표시 및 모션
 - 메인 캐릭터는 성장 단계별(`Egg`, `Baby`, `Teen`, `Adult`)로 표정/스프라이트가 반영된다.
 - 스프라이트 JSON(`source/pet_sprites/main_cat.json`) 기반으로 상태별 프레임(`idle/walk/jump/fall/drag`) 재생이 된다.
+- 단계 폴더에서 변형 이미지(`*_01`, `*_02`, ...)가 누락되면 같은 단계의 기본 감정 이미지(`happy`, `neutral`, `sleep`, `tired`, `dirty`)로 자동 대체된다.
 - PNG 알파값 기반 hit-test로 투명 영역 클릭은 무시된다.
 - 메인 캐릭터는 랜덤 이동 모드/현재 위치 고정 모드를 전환할 수 있다.
 - 드래그 종료 시 관성(속도) 기반 jump/fall 연출이 적용된다.
@@ -39,6 +40,7 @@
 - 스탯: `hunger`, `happiness`, `cleanliness`, `health` (0~100 clamp)
 - Tick: 1분 주기로 스탯 감소(`runTick`)가 적용된다.
 - Feed/Clean/Play 액션은 실제 수치 변화가 있을 때만 적용되고 EXP를 부여한다.
+- 청결도(`cleanliness`)가 60 이하이면 메인 캐릭터 감정 프레임은 `dirty*` 계열을 우선 사용한다.
 - EXP 임계값 기준 성장 단계:
 - `Egg` < 30, `Baby` >= 30, `Teen` >= 90, `Adult` >= 180
 - 경고 문구는 위험 임계치(<=25) 기준으로 생성된다.

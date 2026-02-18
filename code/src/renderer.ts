@@ -119,7 +119,8 @@ const PET_SPRITE_CONFIG_CANDIDATES = [
   '../../../source/pet_sprites/main_cat.json',
   '../../../../source/pet_sprites/main_cat.json',
 ];
-const MAIN_STAGE_PROFILE_KEY_MAP: Record<Exclude<Stage, 'Egg'>, string> = {
+const MAIN_STAGE_PROFILE_KEY_MAP: Record<Stage, string> = {
+  Egg: 'main-cat-egg',
   Baby: 'main-cat-baby',
   Teen: 'main-cat-teen',
   Adult: 'main-cat-adult',
@@ -127,10 +128,11 @@ const MAIN_STAGE_PROFILE_KEY_MAP: Record<Exclude<Stage, 'Egg'>, string> = {
 const HAPPY_IMAGE_SWITCH_MS = 5_000;
 const IDLE_INACTIVE_THRESHOLD_MS = 45_000;
 const INACTIVE_IMAGE_SWITCH_MS = 7_000;
+const DIRTY_CLEANLINESS_THRESHOLD = 60;
 
 type StatKey = 'hunger' | 'happiness' | 'cleanliness' | 'health';
 type MainMotionMode = 'random' | 'fixed';
-type MainEmotionMode = 'happy' | 'tired' | 'sleep' | 'neutral';
+type MainEmotionMode = 'happy' | 'tired' | 'sleep' | 'neutral' | 'dirty';
 
 interface PlaygroundPet {
   id: string;
@@ -680,6 +682,22 @@ function resolveSpriteStates(
   frameCount: number,
   emotionFrameMap?: Map<string, number>,
 ): Record<PetVisualState, SpriteStateRuntime> {
+  const resolveEmotionFrameWithFallback = (emotionId: string): number | null => {
+    if (!emotionFrameMap) {
+      return null;
+    }
+    const exact = emotionFrameMap.get(emotionId);
+    if (Number.isFinite(exact)) {
+      return exact as number;
+    }
+    const baseEmotionId = emotionId.replace(/_\d+$/, '');
+    if (baseEmotionId === emotionId) {
+      return null;
+    }
+    const base = emotionFrameMap.get(baseEmotionId);
+    return Number.isFinite(base) ? (base as number) : null;
+  };
+
   const fallback: Record<PetVisualState, SpriteStateRuntime> = {
     idle: { frames: [0], fps: 2, loop: true },
     walk: { frames: [0], fps: 8, loop: true },
@@ -700,7 +718,7 @@ function resolveSpriteStates(
     const emotionFrames =
       emotionFrameMap && rawState.emotions
         ? rawState.emotions
-            .map((emotionId) => emotionFrameMap.get(emotionId))
+            .map(resolveEmotionFrameWithFallback)
             .filter((frameIndex): frameIndex is number => Number.isFinite(frameIndex))
         : [];
     const frames = directFrames.length > 0 ? directFrames : emotionFrames;
@@ -807,20 +825,25 @@ function registerSpriteProfile(profile: SpriteProfile): void {
   spriteProfileMap.set(profile.key, profile);
 }
 
-function mapAssetPathToGrowthStage(assetPath: string, stageFolder: 'baby' | 'teen'): string {
+function mapAssetPathToGrowthStage(assetPath: string, stageFolder: 'egg' | 'baby' | 'teen'): string {
   return assetPath.replace(/\/(egg|baby|teen|adult)\//, `/${stageFolder}/`);
 }
 
 function cloneConfigForGrowthStage(
   baseConfig: PetSpriteConfig,
-  stageFolder: 'baby' | 'teen',
+  stageFolder: 'egg' | 'baby' | 'teen',
 ): PetSpriteConfig | null {
   if (!baseConfig.frameImages || baseConfig.frameImages.length === 0) {
     return null;
   }
+  const stageKeyByFolder: Record<'egg' | 'baby' | 'teen', Stage> = {
+    egg: 'Egg',
+    baby: 'Baby',
+    teen: 'Teen',
+  };
   return {
     ...baseConfig,
-    name: stageFolder === 'baby' ? MAIN_STAGE_PROFILE_KEY_MAP.Baby : MAIN_STAGE_PROFILE_KEY_MAP.Teen,
+    name: MAIN_STAGE_PROFILE_KEY_MAP[stageKeyByFolder[stageFolder]],
     frameImages: baseConfig.frameImages.map((item) => ({
       ...item,
       image: mapAssetPathToGrowthStage(item.image, stageFolder),
@@ -846,7 +869,7 @@ async function loadSpriteProfileFromConfig(config: PetSpriteConfig): Promise<Spr
     for (const frameImage of config.frameImages) {
       const resolved = await resolveAssetUrl(frameImage.image);
       if (!resolved) {
-        return null;
+        continue;
       }
       resolvedFrameImages.push({
         id: frameImage.id,
@@ -864,31 +887,24 @@ async function loadSpriteProfileFromConfig(config: PetSpriteConfig): Promise<Spr
 }
 
 function resolveMainStageProfile(stage: Stage): SpriteProfile | null {
-  if (stage === 'Egg') {
-    return null;
-  }
   const key = MAIN_STAGE_PROFILE_KEY_MAP[stage];
   return spriteProfileMap.get(key) ?? null;
 }
 
 function getSpriteProfileForPet(pet: PlaygroundPet): SpriteProfile | null {
-  if (pet.kind === 'main' && state.stage === 'Egg') {
-    return null;
-  }
   if (pet.kind === 'main') {
     const stageProfile = resolveMainStageProfile(state.stage);
     if (stageProfile) {
       return stageProfile;
     }
+    // Do not leak other stage assets into main character rendering.
+    return null;
   }
   if (pet.spriteProfile) {
     const assigned = spriteProfileMap.get(pet.spriteProfile);
     if (assigned) {
       return assigned;
     }
-  }
-  if (pet.kind === 'main') {
-    return defaultMainSpriteProfile;
   }
   return null;
 }
@@ -912,6 +928,14 @@ async function initializeSpritePipeline(): Promise<void> {
       ...adultProfile,
       key: config.name,
     });
+
+    const eggConfig = cloneConfigForGrowthStage(config, 'egg');
+    if (eggConfig) {
+      const eggProfile = await loadSpriteProfileFromConfig(eggConfig);
+      if (eggProfile) {
+        registerSpriteProfile(eggProfile);
+      }
+    }
 
     const babyConfig = cloneConfigForGrowthStage(config, 'baby');
     if (babyConfig) {
@@ -1048,6 +1072,9 @@ function pickDifferentRandomFrame(frames: number[], previousFrame: number | null
 }
 
 function resolveMainEmotionMode(nowMs: number): MainEmotionMode {
+  if (state.stats.cleanliness <= DIRTY_CLEANLINESS_THRESHOLD) {
+    return 'dirty';
+  }
   if (state.stats.health <= 60) {
     return 'tired';
   }
